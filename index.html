@@ -390,8 +390,24 @@ function showFormState(state) {
   document.getElementById('form-already').style.display  = state==='already' ? 'block' : 'none';
 }
 
+// ── Cek localStorage saat halaman dimuat ──
+// Kunci: 'giveaway_registered' → simpan username yg sudah daftar
+function checkAlreadyRegistered() {
+  const saved = localStorage.getItem('giveaway_registered');
+  if (saved) {
+    document.getElementById('already-body').textContent =
+      `Username ${saved} sudah terdaftar sebelumnya. Tunggu pengumuman pemenang ya!`;
+    showFormState('already');
+    return true;
+  }
+  return false;
+}
+
 // ── Load settings ──
 async function loadSettings() {
+  // Cek localStorage dulu sebelum load apapun
+  const alreadyDone = checkAlreadyRegistered();
+
   try {
     const snap = await getDoc(doc(db, 'settings', 'main'));
     const s = snap.exists() ? snap.data() : {};
@@ -415,8 +431,8 @@ async function loadSettings() {
     }
 
     // ── Cek status giveaway (dihentikan admin) ──
-    giveawayActive = s.giveawayActive !== false; // default true jika belum diset
-    if (!giveawayActive) {
+    giveawayActive = s.giveawayActive !== false;
+    if (!giveawayActive && !alreadyDone) {
       showFormState('stopped');
     }
 
@@ -425,7 +441,7 @@ async function loadSettings() {
       const target = new Date(s.targetDate);
       document.getElementById('cd-target-txt').textContent =
         `${target.getDate()} ${bulan[target.getMonth()]} ${target.getFullYear()} — ${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
-      startCountdown(target);
+      startCountdown(target, alreadyDone);
     }
 
     bar.style.width = '100%';
@@ -437,7 +453,7 @@ async function loadSettings() {
 }
 
 // ── Countdown ──
-function startCountdown(target) {
+function startCountdown(target, alreadyDone = false) {
   if (cdInterval) clearInterval(cdInterval);
   function tick() {
     const diff = target - new Date();
@@ -446,9 +462,9 @@ function startCountdown(target) {
       giveawayEnded = true;
       document.getElementById('cd-label').textContent = 'Giveaway telah berakhir';
       document.getElementById('cd-display').innerHTML = '<div class="cd-ended">Pengumuman pemenang segera hadir!</div>';
-      // Kunci form jika belum dalam state lain
+      // Kunci form hanya jika belum dalam state lain (already/stopped)
       const mainVisible = document.getElementById('form-main').style.display !== 'none';
-      if (mainVisible) showFormState('ended');
+      if (mainVisible && !alreadyDone) showFormState('ended');
       return;
     }
     document.getElementById('cd-d').textContent = pad(Math.floor(diff/86400000));
@@ -526,6 +542,8 @@ async function submitDaftar() {
       status: 'valid',
       createdAt: serverTimestamp(),
     });
+    // Simpan ke localStorage agar refresh tidak bisa daftar ulang
+    localStorage.setItem('giveaway_registered', tiktok);
     showFormState('success');
     launchConfetti();
   } catch(e) {
@@ -593,8 +611,8 @@ faqs.forEach((f,i) => {
 async function shareWA() {
   const link = window._linkWA || '';
   const shareData = {
-    title: 'Ikutan Giveaway Dana!',
-    text: 'Yuk ikutan giveaway dana gratis! Daftarkan dirimu sekarang dan menangkan hadiah menarik.',
+    title: 'Ikuti Saluran WhatsApp Kami!',
+    text: 'Ikuti saluran WhatsApp ini untuk info giveaway dan update terbaru!',
     url: link,
   };
   try {
