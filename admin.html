@@ -74,7 +74,18 @@ html,body{height:100%;font-family:'Poppins',sans-serif;background:var(--bg);colo
 .tbl-search{flex:1;min-width:180px;background:var(--bg);border:2px solid var(--border);border-radius:12px;padding:10px 14px;font-family:'Poppins',sans-serif;font-size:14px;outline:none;color:var(--dark);transition:border-color .2s}
 .tbl-search:focus{border-color:var(--lime)}
 .tbl-filter{background:var(--bg);border:2px solid var(--border);border-radius:12px;padding:10px 14px;font-size:13px;outline:none;color:var(--dark);cursor:pointer}
-.tbl-wrap{overflow-x:auto;border-radius:14px;border:1.5px solid var(--border)}
+.badge-pending{background:#FFF3D0;color:#A06000;border:1px solid #FFD880}
+.badge-approved{background:#E8FFD0;color:#3A8A00;border:1px solid #B0E87A}
+.badge-rejected{background:#FFE8E8;color:#CC0000;border:1px solid #FFB3B3}
+.izin-card{background:var(--white);border:2px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:12px}
+.izin-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px}
+.izin-card-tiktok{font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:var(--dark)}
+.izin-card-time{font-size:11px;color:var(--muted)}
+.izin-card-alasan{font-size:13px;color:var(--text);background:var(--bg);border-radius:10px;padding:10px 14px;margin-bottom:12px;line-height:1.5}
+.izin-card-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn-approve{background:#E8FFD0;color:#3A8A00;border:1px solid #B0E87A;padding:7px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer}
+.btn-reject{background:#FFE8E8;color:#CC0000;border:1px solid #FFB3B3;padding:7px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer}
+.btn-approve:hover{background:#B0E87A}.btn-reject:hover{background:#FFB3B3}
 table{width:100%;border-collapse:collapse;font-size:13px}
 thead{background:var(--lime-pale)}
 th{padding:12px 16px;text-align:left;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
@@ -199,6 +210,7 @@ tr:hover td{background:#FAFFEE}
       <div class="sb-item" data-page="peserta"><span class="si">👥</span> Peserta</div>
       <div class="sb-item" data-page="undian"><span class="si">🎰</span> Undian</div>
       <div class="sb-item" data-page="pemenang"><span class="si">🏆</span> Pemenang</div>
+      <div class="sb-item" data-page="izin"><span class="si">📩</span> Izin Daftar</div>
       <div class="sb-section">Pengaturan</div>
       <div class="sb-item" data-page="settings"><span class="si">⚙️</span> Pengaturan</div>
     </div>
@@ -297,6 +309,15 @@ tr:hover td{background:#FAFFEE}
       </div>
     </div>
 
+    <!-- IZIN DAFTAR -->
+    <div class="page" id="page-izin">
+      <div class="topbar"><div><div class="page-title">📩 Izin Daftar</div><div class="page-sub">Permohonan daftar ulang dari peserta</div></div></div>
+      <div class="section">
+        <div class="section-title">📋 Daftar Permohonan</div>
+        <div id="izin-list"><p style="font-size:13px;color:var(--muted)">Memuat data...</p></div>
+      </div>
+    </div>
+
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
       <div class="topbar"><div><div class="page-title">⚙️ Pengaturan</div><div class="page-sub">Kustomisasi halaman giveaway dari sini</div></div></div>
@@ -344,6 +365,16 @@ tr:hover td{background:#FAFFEE}
       </div>
 
       <button class="settings-btn" id="btn-save-settings">💾 Simpan Semua Pengaturan</button>
+
+      <!-- STOP GIVEAWAY -->
+      <div class="section" style="margin-top:20px;border-color:#FFD0D0">
+        <div class="section-title" style="color:var(--red)">⛔ Hentikan Giveaway</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">Menghentikan giveaway akan mengunci form pendaftaran di halaman publik sebelum waktu berakhir. Aksi ini bisa diaktifkan kembali kapan saja.</p>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div id="status-giveaway" style="font-family:'Nunito',sans-serif;font-weight:800;font-size:14px"></div>
+          <button id="btn-toggle-giveaway" style="padding:12px 24px;border-radius:12px;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;transition:opacity .2s">-</button>
+        </div>
+      </div>
     </div>
 
   </div><!-- /main -->
@@ -458,6 +489,7 @@ function initApp() {
   listenPeserta();
   loadSettings();
   loadPemenang();
+  loadGiveawayStatus();
 }
 
 // ── SIDEBAR ──
@@ -740,8 +772,98 @@ function goPage(name) {
   document.getElementById('page-'+name).classList.add('active');
   document.querySelector(`[data-page="${name}"]`).classList.add('active');
   if(name==='dashboard') buildChart();
-  if(name==='pemenang') loadPemenang();
+  if(name==='pemenang')  loadPemenang();
+  if(name==='izin')      loadIzin();
   document.getElementById('sidebar').classList.remove('open');
+}
+
+// ── IZIN DAFTAR ──
+async function loadIzin() {
+  const list = document.getElementById('izin-list');
+  list.innerHTML = '<p style="font-size:13px;color:var(--muted)">Memuat...</p>';
+  try {
+    const snap = await getDocs(query(collection(db,'izin_daftar'), orderBy('createdAt','desc')));
+    if (snap.empty) { list.innerHTML='<p style="font-size:13px;color:var(--muted);text-align:center;padding:20px">Belum ada permohonan izin.</p>'; return; }
+    list.innerHTML = '';
+    snap.forEach(d => {
+      const iz = d.data();
+      const ts = iz.createdAt?.toDate ? formatDate(iz.createdAt.toDate()) : '-';
+      const badgeMap = {pending:'badge-pending',approved:'badge-approved',rejected:'badge-rejected'};
+      const labelMap = {pending:'Menunggu',approved:'Disetujui',rejected:'Ditolak'};
+      const card = document.createElement('div');
+      card.className = 'izin-card';
+      card.innerHTML = `
+        <div class="izin-card-head">
+          <div class="izin-card-tiktok">${iz.tiktok}</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge ${badgeMap[iz.status]||'badge-pending'}">${labelMap[iz.status]||iz.status}</span>
+            <span class="izin-card-time">${ts}</span>
+          </div>
+        </div>
+        <div class="izin-card-alasan">"${iz.alasan}"</div>
+        ${iz.status==='pending' ? `
+        <div class="izin-card-actions">
+          <button class="btn-approve" data-action="approve-izin" data-id="${d.id}">✅ Setujui</button>
+          <button class="btn-reject"  data-action="reject-izin"  data-id="${d.id}">❌ Tolak</button>
+        </div>` : ''}
+      `;
+      list.appendChild(card);
+    });
+  } catch(e) { list.innerHTML='<p style="color:var(--red);font-size:13px">Gagal memuat data.</p>'; }
+}
+
+async function updateIzinStatus(id, status) {
+  try {
+    await updateDoc(doc(db,'izin_daftar',id), {status, updatedAt: serverTimestamp()});
+    showToast(status==='approved' ? '✅ Permohonan disetujui!' : '❌ Permohonan ditolak!');
+    loadIzin();
+  } catch(e) { showToast('❌ Gagal update status izin'); }
+}
+
+// ── STOP / AKTIFKAN GIVEAWAY ──
+let giveawayActiveStatus = true;
+
+async function loadGiveawayStatus() {
+  try {
+    const snap = await getDoc(doc(db,'settings','main'));
+    giveawayActiveStatus = snap.exists() ? (snap.data().giveawayActive !== false) : true;
+    updateStopBtn();
+  } catch(e) {}
+}
+
+function updateStopBtn() {
+  const statusEl = document.getElementById('status-giveaway');
+  const btn      = document.getElementById('btn-toggle-giveaway');
+  if (giveawayActiveStatus) {
+    statusEl.innerHTML = '<span style="color:var(--lime)">● Giveaway Aktif</span>';
+    btn.textContent = '⛔ Hentikan Giveaway';
+    btn.style.cssText = 'background:#FFE8E8;color:var(--red);padding:12px 24px;border-radius:12px;border:2px solid #FFB3B3;font-family:Nunito,sans-serif;font-weight:800;font-size:14px;cursor:pointer';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--red)">● Giveaway Dihentikan</span>';
+    btn.textContent = '▶️ Aktifkan Kembali';
+    btn.style.cssText = 'background:#E8FFD0;color:#3A8A00;padding:12px 24px;border-radius:12px;border:2px solid #B0E87A;font-family:Nunito,sans-serif;font-weight:800;font-size:14px;cursor:pointer';
+  }
+}
+
+async function toggleGiveaway() {
+  const newStatus = !giveawayActiveStatus;
+  const konfirmMsg = newStatus
+    ? 'Aktifkan kembali giveaway? Form pendaftaran akan dibuka lagi.'
+    : 'Hentikan giveaway sekarang? Form pendaftaran akan dikunci di halaman publik.';
+  document.getElementById('modal-icon').textContent  = newStatus ? '▶️' : '⛔';
+  document.getElementById('modal-title').textContent = newStatus ? 'Aktifkan Giveaway' : 'Hentikan Giveaway';
+  document.getElementById('modal-body').textContent  = konfirmMsg;
+  document.getElementById('modal-confirm-btn').style.background = newStatus ? '#5DBA00' : 'var(--red)';
+  document.getElementById('modal-confirm-btn').onclick = async () => {
+    try {
+      await setDoc(doc(db,'settings','main'), {giveawayActive: newStatus}, {merge:true});
+      giveawayActiveStatus = newStatus;
+      updateStopBtn();
+      closeModal();
+      showToast(newStatus ? '▶️ Giveaway diaktifkan kembali!' : '⛔ Giveaway dihentikan!');
+    } catch(e) { showToast('❌ Gagal mengubah status'); closeModal(); }
+  };
+  document.getElementById('confirm-modal').classList.add('show');
 }
 
 // ── CHART ──
@@ -789,6 +911,7 @@ document.getElementById('btn-undian-start').addEventListener('click', startUndia
 document.getElementById('btn-undian-ulang').addEventListener('click', ulangUndian);
 document.getElementById('btn-undian-save').addEventListener('click', saveWinner);
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+document.getElementById('btn-toggle-giveaway').addEventListener('click', toggleGiveaway);
 document.getElementById('search-input').addEventListener('input', filterTable);
 document.getElementById('filter-status').addEventListener('change', filterTable);
 document.getElementById('btn-prev').addEventListener('click', () => changePage(-1));
@@ -810,6 +933,8 @@ document.addEventListener('click', e => {
   if (action === 'invalid')        setStatus(id, 'invalid');
   if (action === 'delete')         confirmDelete(id, name);
   if (action === 'deletepemenang') deletePemenang(id);
+  if (action === 'approve-izin')   updateIzinStatus(id, 'approved');
+  if (action === 'reject-izin')    updateIzinStatus(id, 'rejected');
 });
 </script>
 </body>
