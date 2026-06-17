@@ -391,22 +391,35 @@ function showFormState(state) {
 }
 
 // ── Cek localStorage saat halaman dimuat ──
-// Kunci: 'giveaway_registered' → simpan username yg sudah daftar
-function checkAlreadyRegistered() {
+async function checkAlreadyRegistered() {
   const saved = localStorage.getItem('giveaway_registered');
-  if (saved) {
-    document.getElementById('already-body').textContent =
-      `Username ${saved} sudah terdaftar sebelumnya. Tunggu pengumuman pemenang ya!`;
-    showFormState('already');
-    return true;
-  }
-  return false;
+  if (!saved) return false;
+
+  // Cek apakah ada izin daftar ulang yang sudah disetujui admin
+  try {
+    const izinSnap = await getDocs(query(
+      collection(db, 'izin_daftar'),
+      where('tiktok', '==', saved),
+      where('status', '==', 'approved')
+    ));
+    if (!izinSnap.empty) {
+      // Admin sudah setujui — hapus localStorage, biarkan daftar lagi
+      localStorage.removeItem('giveaway_registered');
+      return false;
+    }
+  } catch(e) { console.error('Cek izin error:', e); }
+
+  // Belum disetujui — tampilkan state already
+  document.getElementById('already-body').textContent =
+    `Username ${saved} sudah terdaftar sebelumnya. Tunggu pengumuman pemenang ya!`;
+  showFormState('already');
+  return true;
 }
 
 // ── Load settings ──
 async function loadSettings() {
-  // Cek localStorage dulu sebelum load apapun
-  const alreadyDone = checkAlreadyRegistered();
+  // Cek localStorage + izin approved dulu sebelum load apapun
+  const alreadyDone = await checkAlreadyRegistered();
 
   try {
     const snap = await getDoc(doc(db, 'settings', 'main'));
