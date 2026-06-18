@@ -369,11 +369,29 @@ tr:hover td{background:#FAFFEE}
       <!-- STOP GIVEAWAY -->
       <div class="section" style="margin-top:20px;border-color:#FFD0D0">
         <div class="section-title" style="color:var(--red)">⛔ Hentikan Giveaway</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">Menghentikan giveaway akan mengunci form pendaftaran di halaman publik sebelum waktu berakhir. Aksi ini bisa diaktifkan kembali kapan saja.</p>
-        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">Giveaway bisa dihentikan dengan 2 cara: manual oleh admin (dengan alasan), atau otomatis saat countdown habis.</p>
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
           <div id="status-giveaway" style="font-family:'Nunito',sans-serif;font-weight:800;font-size:14px"></div>
-          <button id="btn-toggle-giveaway" style="padding:12px 24px;border-radius:12px;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;transition:opacity .2s">-</button>
         </div>
+
+        <div class="field-row-2" style="margin-bottom:14px">
+          <div>
+            <label class="field-label">Mode Giveaway</label>
+            <select class="field-input" id="stop-mode">
+              <option value="manual">Manual — Berakhir berdasarkan pencapaian</option>
+              <option value="countdown">Countdown — Berakhir saat waktu habis</option>
+            </select>
+            <div class="field-hint" id="stop-mode-hint">Manual: tidak ada timer, admin yang tentukan kapan berhenti berdasarkan pencapaian (misal: 250 follower baru)</div>
+          </div>
+          <div id="stop-reason-wrap">
+            <label class="field-label" id="stop-reason-label">Target / Pencapaian</label>
+            <input class="field-input" id="stop-reason-input" placeholder="Contoh: 250 Follower Baru Diumumkan"/>
+            <div class="field-hint" id="stop-reason-hint">Ditampilkan ke peserta sebagai syarat berakhirnya giveaway</div>
+          </div>
+        </div>
+
+        <button id="btn-toggle-giveaway" style="padding:12px 24px;border-radius:12px;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;transition:opacity .2s">-</button>
       </div>
     </div>
 
@@ -826,7 +844,13 @@ let giveawayActiveStatus = true;
 async function loadGiveawayStatus() {
   try {
     const snap = await getDoc(doc(db,'settings','main'));
-    giveawayActiveStatus = snap.exists() ? (snap.data().giveawayActive !== false) : true;
+    const s = snap.exists() ? snap.data() : {};
+    giveawayActiveStatus = s.giveawayActive !== false;
+    // Set stop mode select
+    const mode = s.stopMode || 'manual';
+    document.getElementById('stop-mode').value = mode;
+    // Set alasan
+    document.getElementById('stop-reason-input').value = s.stopReason || '';
     updateStopBtn();
   } catch(e) {}
 }
@@ -846,21 +870,44 @@ function updateStopBtn() {
 }
 
 async function toggleGiveaway() {
-  const newStatus = !giveawayActiveStatus;
-  const konfirmMsg = newStatus
-    ? 'Aktifkan kembali giveaway? Form pendaftaran akan dibuka lagi.'
-    : 'Hentikan giveaway sekarang? Form pendaftaran akan dikunci di halaman publik.';
+  const newStatus   = !giveawayActiveStatus;
+  const stopMode    = document.getElementById('stop-mode').value;
+  const stopReason  = document.getElementById('stop-reason-input').value.trim();
+
+  let konfirmMsg = '';
+  if (newStatus) {
+    konfirmMsg = 'Aktifkan kembali giveaway? Form pendaftaran akan dibuka lagi.';
+  } else {
+    if (stopMode === 'countdown') {
+      konfirmMsg = 'Giveaway akan dihentikan otomatis saat countdown habis. Lanjutkan?';
+    } else {
+      konfirmMsg = `Hentikan giveaway sekarang secara manual?${stopReason ? `\n\nAlasan: "${stopReason}"` : ''}`;
+    }
+  }
+
   document.getElementById('modal-icon').textContent  = newStatus ? '▶️' : '⛔';
   document.getElementById('modal-title').textContent = newStatus ? 'Aktifkan Giveaway' : 'Hentikan Giveaway';
   document.getElementById('modal-body').textContent  = konfirmMsg;
   document.getElementById('modal-confirm-btn').style.background = newStatus ? '#5DBA00' : 'var(--red)';
   document.getElementById('modal-confirm-btn').onclick = async () => {
     try {
-      await setDoc(doc(db,'settings','main'), {giveawayActive: newStatus}, {merge:true});
-      giveawayActiveStatus = newStatus;
+      const updateData = {
+        giveawayActive: newStatus,
+        stopMode: stopMode,
+        stopReason: newStatus ? '' : stopReason, // hapus alasan saat diaktifkan lagi
+      };
+      // Kalau mode countdown & dihentikan, giveawayActive tetap true — biarkan countdown yang mengunci
+      if (!newStatus && stopMode === 'countdown') {
+        updateData.giveawayActive = true; // tetap aktif, countdown yang akan kunci
+        updateData.stopByCountdown = true;
+      } else {
+        updateData.stopByCountdown = false;
+      }
+      await setDoc(doc(db,'settings','main'), updateData, {merge:true});
+      giveawayActiveStatus = newStatus || stopMode === 'countdown';
       updateStopBtn();
       closeModal();
-      showToast(newStatus ? '▶️ Giveaway diaktifkan kembali!' : '⛔ Giveaway dihentikan!');
+      showToast(newStatus ? '▶️ Giveaway diaktifkan kembali!' : stopMode === 'countdown' ? '⏰ Giveaway akan berhenti saat countdown habis!' : '⛔ Giveaway dihentikan!');
     } catch(e) { showToast('❌ Gagal mengubah status'); closeModal(); }
   };
   document.getElementById('confirm-modal').classList.add('show');
@@ -912,6 +959,24 @@ document.getElementById('btn-undian-ulang').addEventListener('click', ulangUndia
 document.getElementById('btn-undian-save').addEventListener('click', saveWinner);
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 document.getElementById('btn-toggle-giveaway').addEventListener('click', toggleGiveaway);
+document.getElementById('stop-mode').addEventListener('change', () => {
+  const mode = document.getElementById('stop-mode').value;
+  const label = document.getElementById('stop-reason-label');
+  const hint  = document.getElementById('stop-reason-hint');
+  const input = document.getElementById('stop-reason-input');
+  const modeHint = document.getElementById('stop-mode-hint');
+  if (mode === 'manual') {
+    label.textContent       = 'Target / Pencapaian';
+    input.placeholder       = 'Contoh: 250 Follower Baru Diumumkan';
+    hint.textContent        = 'Ditampilkan ke peserta sebagai syarat berakhirnya giveaway';
+    modeHint.textContent    = 'Manual: tidak ada timer, admin yang tentukan kapan berhenti berdasarkan pencapaian';
+  } else {
+    label.textContent       = 'Alasan Penghentian (opsional)';
+    input.placeholder       = 'Contoh: Kuota peserta sudah penuh';
+    hint.textContent        = 'Ditampilkan ke peserta saat form dikunci (opsional)';
+    modeHint.textContent    = 'Countdown: form otomatis terkunci saat timer habis';
+  }
+});
 document.getElementById('search-input').addEventListener('input', filterTable);
 document.getElementById('filter-status').addEventListener('change', filterTable);
 document.getElementById('btn-prev').addEventListener('click', () => changePage(-1));
