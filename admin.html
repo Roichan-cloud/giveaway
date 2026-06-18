@@ -366,7 +366,15 @@ tr:hover td{background:#FAFFEE}
 
       <button class="settings-btn" id="btn-save-settings">💾 Simpan Semua Pengaturan</button>
 
-      <!-- STOP GIVEAWAY -->
+      <!-- RESET GIVEAWAY -->
+      <div class="section" style="margin-top:20px;border-color:#FFD0D0">
+        <div class="section-title" style="color:var(--red)">🔄 Reset Giveaway</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">Hapus semua data peserta, pemenang, dan izin daftar sekaligus untuk memulai giveaway baru. <strong style="color:var(--red)">Aksi ini tidak bisa dibatalkan!</strong></p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button id="btn-reset-semua" style="padding:12px 24px;border-radius:12px;border:2px solid #FFB3B3;background:#FFE8E8;color:var(--red);font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer">🗑️ Reset Semua Data</button>
+          <button id="btn-reset-peserta" style="padding:12px 24px;border-radius:12px;border:2px solid var(--border);background:var(--white);color:var(--muted);font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer">👥 Reset Peserta Saja</button>
+        </div>
+      </div>
       <div class="section" style="margin-top:20px;border-color:#FFD0D0">
         <div class="section-title" style="color:var(--red)">⛔ Hentikan Giveaway</div>
         <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">Giveaway bisa dihentikan dengan 2 cara: manual oleh admin (dengan alasan), atau otomatis saat countdown habis.</p>
@@ -504,28 +512,39 @@ async function doLogout() {
 
 // ── INIT ──
 function initApp() {
+  mintaNotifAdmin();
   listenPeserta();
   loadSettings();
   loadPemenang();
   loadGiveawayStatus();
 }
 
-// ── SIDEBAR ──
-window.goPage = function(name) {
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
-  document.querySelector(`[data-page="${name}"]`).classList.add('active');
-  if(name==='dashboard') buildChart();
-  if(name==='pemenang') loadPemenang();
-  document.getElementById('sidebar').classList.remove('open');
-};
-window.toggleSidebar = () => document.getElementById('sidebar').classList.toggle('open');
+// ── NOTIFIKASI BROWSER ADMIN ──
+async function mintaNotifAdmin() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+    await Notification.requestPermission();
+  }
+}
+
+function kirimNotifAdmin(title, body) {
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body });
+  }
+}
 
 // ── REAL-TIME PESERTA ──
+let prevPesertaCount = -1;
 function listenPeserta() {
   const q = query(collection(db,'peserta'), orderBy('createdAt','desc'));
   unsubPeserta = onSnapshot(q, snap => {
+    const newCount = snap.size;
+    // Kirim notif kalau ada peserta baru (bukan load pertama)
+    if (prevPesertaCount !== -1 && newCount > prevPesertaCount) {
+      const newest = snap.docs[0]?.data();
+      kirimNotifAdmin('🎉 Peserta Baru!', `${newest?.tiktokDisplay || 'Seseorang'} baru saja mendaftar. Total: ${newCount} peserta.`);
+    }
+    prevPesertaCount = newCount;
     allPeserta = snap.docs.map(d => ({id:d.id, ...d.data()}));
     updateStats();
     filterTable();
@@ -783,7 +802,56 @@ function updateDashCountdown(targetDate) {
   tick(); cdDashInterval = setInterval(tick,1000);
 }
 
-// ── SIDEBAR NAV ──
+// ── RESET GIVEAWAY ──
+async function resetCollection(colName) {
+  const snap = await getDocs(collection(db, colName));
+  const deletes = snap.docs.map(d => deleteDoc(doc(db, colName, d.id)));
+  await Promise.all(deletes);
+}
+
+async function resetSemua() {
+  document.getElementById('modal-icon').textContent  = '🔄';
+  document.getElementById('modal-title').textContent = 'Reset Semua Data';
+  document.getElementById('modal-body').textContent  = 'Ini akan menghapus SEMUA peserta, pemenang, dan izin daftar. Giveaway akan dimulai dari awal. Aksi ini tidak bisa dibatalkan!';
+  document.getElementById('modal-confirm-btn').style.background = 'var(--red)';
+  document.getElementById('modal-confirm-btn').onclick = async () => {
+    closeModal();
+    showToast('⏳ Mereset data...');
+    try {
+      await Promise.all([
+        resetCollection('peserta'),
+        resetCollection('pemenang'),
+        resetCollection('izin_daftar'),
+      ]);
+      // Reset status giveaway jadi aktif
+      await setDoc(doc(db,'settings','main'), {giveawayActive: true, stopReason: ''}, {merge:true});
+      sessionWinners = []; lastWinner = null;
+      giveawayActiveStatus = true;
+      updateStopBtn();
+      showToast('✅ Semua data berhasil direset!');
+    } catch(e) { showToast('❌ Gagal reset: '+e.message); }
+  };
+  document.getElementById('confirm-modal').classList.add('show');
+}
+
+async function resetPesertaSaja() {
+  document.getElementById('modal-icon').textContent  = '👥';
+  document.getElementById('modal-title').textContent = 'Reset Peserta';
+  document.getElementById('modal-body').textContent  = 'Ini akan menghapus semua data peserta dan izin daftar. Data pemenang tetap tersimpan. Aksi ini tidak bisa dibatalkan!';
+  document.getElementById('modal-confirm-btn').style.background = 'var(--red)';
+  document.getElementById('modal-confirm-btn').onclick = async () => {
+    closeModal();
+    showToast('⏳ Mereset peserta...');
+    try {
+      await Promise.all([
+        resetCollection('peserta'),
+        resetCollection('izin_daftar'),
+      ]);
+      showToast('✅ Data peserta berhasil direset!');
+    } catch(e) { showToast('❌ Gagal reset: '+e.message); }
+  };
+  document.getElementById('confirm-modal').classList.add('show');
+}
 function goPage(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
@@ -959,6 +1027,8 @@ document.getElementById('btn-undian-ulang').addEventListener('click', ulangUndia
 document.getElementById('btn-undian-save').addEventListener('click', saveWinner);
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 document.getElementById('btn-toggle-giveaway').addEventListener('click', toggleGiveaway);
+document.getElementById('btn-reset-semua').addEventListener('click', resetSemua);
+document.getElementById('btn-reset-peserta').addEventListener('click', resetPesertaSaja);
 document.getElementById('stop-mode').addEventListener('change', () => {
   const mode = document.getElementById('stop-mode').value;
   const label = document.getElementById('stop-reason-label');
