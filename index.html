@@ -166,6 +166,19 @@ canvas#confetti{position:fixed;top:0;left:0;width:100%;height:100%;pointer-event
 .izin-success{display:none;text-align:center;padding:12px 0}
 .izin-success p{font-size:13px;color:var(--lime);font-weight:600}
 
+/* CEK STATUS */
+.cek-card{background:var(--white);border:2px solid var(--border);border-radius:24px;padding:24px 22px;margin-bottom:28px;box-shadow:0 4px 20px rgba(93,186,0,.08)}
+.cek-input-row{display:flex;gap:10px;margin-bottom:0}
+.cek-input-row .form-input{flex:1;margin-bottom:0}
+.btn-cek{background:linear-gradient(135deg,var(--lime),var(--lime-l));color:var(--white);font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;padding:14px 20px;border:none;border-radius:14px;cursor:pointer;white-space:nowrap;transition:opacity .2s}
+.btn-cek:disabled{opacity:.6;cursor:not-allowed}
+.cek-result{margin-top:14px;display:none;border-radius:14px;padding:14px 16px;font-size:13px;line-height:1.6}
+.cek-result.valid{background:#E8FFD0;border:1.5px solid #B0E87A;color:#2A6A00}
+.cek-result.invalid{background:#FFE8E8;border:1.5px solid #FFB3B3;color:#CC0000}
+.cek-result.pending{background:#FFF3D0;border:1.5px solid #FFD880;color:#7A4A00}
+.cek-result.notfound{background:#F5F5F5;border:1.5px solid #DDD;color:#555}
+.cek-result-title{font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;margin-bottom:4px}
+
 @media(max-width:400px){.cd-grid{gap:6px}.cd-sep{font-size:22px}.cd-num{border-radius:12px}}
 </style>
 </head>
@@ -356,6 +369,22 @@ canvas#confetti{position:fixed;top:0;left:0;width:100%;height:100%;pointer-event
     </div>
   </div>
 
+  <!-- CEK STATUS -->
+  <div class="cek-card">
+    <div class="sec-head" style="margin-bottom:12px"><div class="sec-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </div>Cek Status Pendaftaran</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Masukkan username TikTok kamu untuk mengecek status pendaftaran.</p>
+    <div class="cek-input-row">
+      <input class="form-input" id="cek-input" type="text" placeholder="@username_tiktok_kamu"/>
+      <button class="btn-cek" id="btn-cek">Cek</button>
+    </div>
+    <div class="cek-result" id="cek-result">
+      <div class="cek-result-title" id="cek-result-title"></div>
+      <div id="cek-result-body"></div>
+    </div>
+  </div>
+
   <!-- FAQ -->
   <div class="sec-head"><div class="sec-icon">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -458,27 +487,6 @@ async function loadSettings() {
   }
 }
 
-// ── Countdown ──
-function startCountdown(target) {
-  if (cdInterval) clearInterval(cdInterval);
-  function tick() {
-    const diff = target - new Date();
-    if (diff <= 0) {
-      clearInterval(cdInterval);
-      giveawayEnded = true;
-      document.getElementById('cd-label').textContent = 'Giveaway telah berakhir';
-      document.getElementById('cd-display').innerHTML = '<div class="cd-ended">Pengumuman pemenang segera hadir!</div>';
-      if (document.getElementById('form-main').style.display !== 'none') showFormState('ended');
-      return;
-    }
-    document.getElementById('cd-d').textContent = pad(Math.floor(diff/86400000));
-    document.getElementById('cd-h').textContent = pad(Math.floor((diff%86400000)/3600000));
-    document.getElementById('cd-m').textContent = pad(Math.floor((diff%3600000)/60000));
-    document.getElementById('cd-s').textContent = pad(Math.floor((diff%60000)/1000));
-  }
-  tick();
-  cdInterval = setInterval(tick, 1000);
-}
 
 // ── Real-time participant count ──
 function listenParticipants() {
@@ -648,6 +656,126 @@ faqs.forEach((f,i) => {
   fw.appendChild(item);
 });
 
+// ── Cek Status Pendaftaran ──
+async function cekStatus() {
+  const input = document.getElementById('cek-input').value.trim();
+  const result = document.getElementById('cek-result');
+  const title  = document.getElementById('cek-result-title');
+  const body   = document.getElementById('cek-result-body');
+  const btn    = document.getElementById('btn-cek');
+
+  if (!input) return;
+  const username = input.startsWith('@') ? input.toLowerCase() : ('@'+input).toLowerCase();
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  result.style.display = 'none';
+
+  try {
+    const snap = await getDocs(query(collection(db,'peserta'), where('tiktok','==', username)));
+    result.style.display = 'block';
+    result.className = 'cek-result';
+
+    if (snap.empty) {
+      result.classList.add('notfound');
+      title.textContent = 'Tidak Ditemukan';
+      body.textContent  = `Username ${username} belum terdaftar di giveaway ini.`;
+    } else {
+      const data = snap.docs[0].data();
+      if (data.status === 'valid') {
+        result.classList.add('valid');
+        title.textContent = '✅ Terdaftar & Valid';
+        body.textContent  = `${data.tiktokDisplay || username} sudah terdaftar dan statusnya valid. Tunggu pengumuman pemenang!`;
+      } else if (data.status === 'invalid') {
+        result.classList.add('invalid');
+        title.textContent = '🚫 Didiskualifikasi';
+        body.textContent  = `${data.tiktokDisplay || username} terdaftar namun didiskualifikasi oleh admin. Hubungi admin untuk informasi lebih lanjut.`;
+      } else {
+        result.classList.add('pending');
+        title.textContent = '⏳ Menunggu Verifikasi';
+        body.textContent  = `${data.tiktokDisplay || username} sudah terdaftar dan sedang menunggu verifikasi admin.`;
+      }
+    }
+  } catch(e) {
+    result.style.display = 'block';
+    result.className = 'cek-result notfound';
+    title.textContent = 'Gagal';
+    body.textContent  = 'Gagal mengecek status. Coba lagi.';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Cek';
+}
+
+// ── Tab title countdown real-time ──
+const originalTitle = document.title;
+function updateTabTitle(diff) {
+  if (diff <= 0) { document.title = '⏰ Giveaway Berakhir!'; return; }
+  const d = Math.floor(diff/86400000);
+  const h = Math.floor((diff%86400000)/3600000);
+  const m = Math.floor((diff%3600000)/60000);
+  const s = Math.floor((diff%60000)/1000);
+  if (d > 0) document.title = `⏳ ${d}h ${pad(h)}j — Giveaway Dana`;
+  else       document.title = `⏳ ${pad(h)}:${pad(m)}:${pad(s)} — Giveaway Dana`;
+}
+
+// ── Notifikasi Browser ──
+async function mintaNotifikasi() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') return;
+  if (Notification.permission !== 'denied') {
+    await Notification.requestPermission();
+  }
+}
+
+function kirimNotif(title, body, icon='') {
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body, icon });
+  }
+}
+
+// ── Override startCountdown untuk tab title & notif ──
+const _origStartCountdown = startCountdown;
+function startCountdown(target) {
+  if (cdInterval) clearInterval(cdInterval);
+  let notif1HourSent = false;
+  let notif1MinSent  = false;
+
+  function tick() {
+    const diff = target - new Date();
+    updateTabTitle(diff);
+    if (diff <= 0) {
+      clearInterval(cdInterval);
+      giveawayEnded = true;
+      document.title = '⏰ Giveaway Berakhir!';
+      document.getElementById('cd-label').textContent = 'Giveaway telah berakhir';
+      document.getElementById('cd-display').innerHTML = '<div class="cd-ended">Pengumuman pemenang segera hadir!</div>';
+      if (document.getElementById('form-main').style.display !== 'none') showFormState('ended');
+      kirimNotif('⏰ Giveaway Berakhir!', 'Waktu pendaftaran sudah habis. Nantikan pengumuman pemenang!');
+      return;
+    }
+    // Notif 1 jam sebelum berakhir
+    if (!notif1HourSent && diff <= 3600000 && diff > 3540000) {
+      kirimNotif('⏳ 1 Jam Lagi!', 'Giveaway akan berakhir dalam 1 jam. Segera daftar!');
+      notif1HourSent = true;
+    }
+    // Notif 1 menit sebelum berakhir
+    if (!notif1MinSent && diff <= 60000 && diff > 54000) {
+      kirimNotif('🚨 1 Menit Lagi!', 'Giveaway hampir berakhir! Daftar sekarang sebelum terlambat.');
+      notif1MinSent = true;
+    }
+    document.getElementById('cd-d').textContent = pad(Math.floor(diff/86400000));
+    document.getElementById('cd-h').textContent = pad(Math.floor((diff%86400000)/3600000));
+    document.getElementById('cd-m').textContent = pad(Math.floor((diff%3600000)/60000));
+    document.getElementById('cd-s').textContent = pad(Math.floor((diff%60000)/1000));
+  }
+  tick();
+  cdInterval = setInterval(tick, 1000);
+}
+
+// Minta izin notifikasi saat halaman dimuat
+mintaNotifikasi();
+
 // ── Share saluran WA ──
 async function shareWA() {
   const link = window._linkWA || '';
@@ -658,10 +786,8 @@ async function shareWA() {
   };
   try {
     if (navigator.share) {
-      // Native share sheet (Android/iOS)
       await navigator.share(shareData);
     } else {
-      // Fallback: copy link ke clipboard
       await navigator.clipboard.writeText(link);
       const btn = document.getElementById('btn-share-wa');
       const orig = btn.textContent;
@@ -669,7 +795,6 @@ async function shareWA() {
       setTimeout(() => btn.textContent = orig, 2000);
     }
   } catch(e) {
-    // User membatalkan share — tidak perlu error
     if (e.name !== 'AbortError') console.error(e);
   }
 }
@@ -678,6 +803,8 @@ async function shareWA() {
 document.getElementById('btn-daftar').addEventListener('click', submitDaftar);
 document.getElementById('btn-share-wa').addEventListener('click', shareWA);
 document.getElementById('btn-izin').addEventListener('click', kirimIzin);
+document.getElementById('btn-cek').addEventListener('click', cekStatus);
+document.getElementById('cek-input').addEventListener('keydown', e => { if(e.key==='Enter') cekStatus(); });
 document.getElementById('btn-show-izin').addEventListener('click', () => {
   document.getElementById('btn-show-izin').style.display = 'none';
   document.getElementById('izin-form').style.display = 'block';
