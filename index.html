@@ -202,8 +202,8 @@ canvas#confetti{position:fixed;top:0;left:0;width:100%;height:100%;pointer-event
     </div>
   </div>
 
-  <!-- COUNTDOWN -->
-  <div class="cd-section">
+  <!-- COUNTDOWN (hanya tampil jika mode countdown) -->
+  <div class="cd-section" id="cd-section" style="display:none">
     <div class="cd-label" id="cd-label">Giveaway berakhir dalam</div>
     <div id="cd-display">
       <div class="cd-grid">
@@ -217,6 +217,13 @@ canvas#confetti{position:fixed;top:0;left:0;width:100%;height:100%;pointer-event
       </div>
       <div class="cd-target">Berakhir: <strong id="cd-target-txt">-</strong></div>
     </div>
+  </div>
+
+  <!-- MANUAL GOAL (hanya tampil jika mode manual) -->
+  <div class="cd-section" id="manual-section" style="display:none">
+    <div class="cd-label">Giveaway berakhir saat</div>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(20px,5vw,30px);color:var(--white);margin:12px 0 6px;line-height:1.3" id="manual-goal-text">-</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.7)">Admin akan mengumumkan pemenang setelah tercapai</div>
   </div>
 
   <!-- SYARAT -->
@@ -306,6 +313,7 @@ canvas#confetti{position:fixed;top:0;left:0;width:100%;height:100%;pointer-event
       <div class="form-closed-icon">🚫</div>
       <div class="form-closed-title">Giveaway Dihentikan</div>
       <div class="form-closed-body">Giveaway ini telah dihentikan oleh admin sebelum waktunya.<br/>Nantikan giveaway berikutnya!</div>
+      <div id="stopped-reason" style="display:none;margin-top:10px;font-size:13px;color:var(--muted);background:var(--lime-pale2);border-radius:10px;padding:10px 14px;text-align:left"></div>
     </div>
 
     <!-- State: waktu habis -->
@@ -317,6 +325,7 @@ canvas#confetti{position:fixed;top:0;left:0;width:100%;height:100%;pointer-event
 
     <!-- State: sudah pernah daftar -->
     <div class="form-closed" id="form-already">
+      <input type="hidden" id="izin-tiktok-hidden" value=""/>
       <div class="form-closed-icon">✅</div>
       <div class="form-closed-title">Kamu Sudah Terdaftar!</div>
       <div class="form-closed-body" id="already-body">Username TikTok kamu sudah ada di daftar peserta. Tunggu pengumuman pemenang ya!</div>
@@ -382,58 +391,24 @@ bar.style.width = '40%';
 
 // ── Helper: tampilkan state form ──
 function showFormState(state) {
-  // state: 'main' | 'success' | 'stopped' | 'ended' | 'already'
-  document.getElementById('form-main').style.display     = state==='main'    ? 'block' : 'none';
-  document.getElementById('form-success').style.display  = state==='success' ? 'block' : 'none';
-  document.getElementById('form-stopped').style.display  = state==='stopped' ? 'block' : 'none';
-  document.getElementById('form-ended').style.display    = state==='ended'   ? 'block' : 'none';
-  document.getElementById('form-already').style.display  = state==='already' ? 'block' : 'none';
-}
-
-// ── Cek localStorage saat halaman dimuat ──
-async function checkAlreadyRegistered() {
-  const saved = localStorage.getItem('giveaway_registered');
-  if (!saved) return false;
-
-  // Cek apakah ada izin daftar ulang yang sudah disetujui admin
-  try {
-    const izinSnap = await getDocs(query(
-      collection(db, 'izin_daftar'),
-      where('tiktok', '==', saved),
-      where('status', '==', 'approved')
-    ));
-    if (!izinSnap.empty) {
-      // Admin sudah setujui — hapus localStorage, biarkan daftar lagi
-      localStorage.removeItem('giveaway_registered');
-      return false;
-    }
-  } catch(e) { console.error('Cek izin error:', e); }
-
-  // Belum disetujui — tampilkan state already
-  document.getElementById('already-body').textContent =
-    `Username ${saved} sudah terdaftar sebelumnya. Tunggu pengumuman pemenang ya!`;
-  showFormState('already');
-  return true;
+  document.getElementById('form-main').style.display    = state==='main'    ? 'block' : 'none';
+  document.getElementById('form-success').style.display = state==='success' ? 'block' : 'none';
+  document.getElementById('form-stopped').style.display = state==='stopped' ? 'block' : 'none';
+  document.getElementById('form-ended').style.display   = state==='ended'   ? 'block' : 'none';
+  document.getElementById('form-already').style.display = state==='already' ? 'block' : 'none';
 }
 
 // ── Load settings ──
 async function loadSettings() {
-  // Cek localStorage + izin approved dulu sebelum load apapun
-  const alreadyDone = await checkAlreadyRegistered();
-
   try {
     const snap = await getDoc(doc(db, 'settings', 'main'));
     const s = snap.exists() ? snap.data() : {};
 
-    document.getElementById('hero-amt').textContent   = s.giveawayAmount || 'DANA';
-    document.getElementById('hero-desc').textContent  = s.heroDesc || 'Giveaway dana tunai langsung ke rekening DANA kamu.';
+    document.getElementById('hero-amt').textContent    = s.giveawayAmount || 'DANA';
+    document.getElementById('hero-desc').textContent   = s.heroDesc || 'Giveaway dana tunai langsung ke rekening DANA kamu.';
     document.getElementById('footer-name').textContent = s.adminName || '-';
 
-    if (s.linkWA) {
-      document.getElementById('link-wa').href = s.linkWA;
-      // Simpan link WA untuk tombol share
-      window._linkWA = s.linkWA;
-    }
+    if (s.linkWA)     { document.getElementById('link-wa').href = s.linkWA; window._linkWA = s.linkWA; }
     if (s.linkTikTok) { document.getElementById('link-tt').href = s.linkTikTok; }
 
     if (s.popupEnabled !== false) {
@@ -443,18 +418,36 @@ async function loadSettings() {
       setTimeout(() => document.getElementById('popup').classList.add('show'), 3000);
     }
 
-    // ── Cek status giveaway (dihentikan admin) ──
-    giveawayActive = s.giveawayActive !== false;
-    if (!giveawayActive && !alreadyDone) {
-      showFormState('stopped');
-    }
+    const stopMode = s.stopMode || 'countdown';
 
-    // ── Countdown ──
-    if (s.targetDate) {
-      const target = new Date(s.targetDate);
-      document.getElementById('cd-target-txt').textContent =
-        `${target.getDate()} ${bulan[target.getMonth()]} ${target.getFullYear()} — ${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
-      startCountdown(target, alreadyDone);
+    // ── Mode Manual: tampilkan goal, sembunyikan countdown ──
+    if (stopMode === 'manual') {
+      document.getElementById('manual-section').style.display = 'block';
+      document.getElementById('cd-section').style.display     = 'none';
+      document.getElementById('manual-goal-text').textContent = s.stopReason || 'Ditentukan oleh admin';
+      // Cek apakah admin sudah menghentikan
+      giveawayActive = s.giveawayActive !== false;
+      if (!giveawayActive) {
+        document.getElementById('stopped-reason').textContent     = s.stopReason ? `Pencapaian: ${s.stopReason}` : '';
+        document.getElementById('stopped-reason').style.display   = s.stopReason ? 'block' : 'none';
+        showFormState('stopped');
+      }
+
+    // ── Mode Countdown: tampilkan timer, sembunyikan manual ──
+    } else {
+      document.getElementById('cd-section').style.display     = 'block';
+      document.getElementById('manual-section').style.display = 'none';
+      giveawayActive = s.giveawayActive !== false;
+      if (!giveawayActive) {
+        document.getElementById('stopped-reason').textContent   = s.stopReason ? `Alasan: ${s.stopReason}` : '';
+        document.getElementById('stopped-reason').style.display = s.stopReason ? 'block' : 'none';
+        showFormState('stopped');
+      } else if (s.targetDate) {
+        const target = new Date(s.targetDate);
+        document.getElementById('cd-target-txt').textContent =
+          `${target.getDate()} ${bulan[target.getMonth()]} ${target.getFullYear()} — ${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
+        startCountdown(target);
+      }
     }
 
     bar.style.width = '100%';
@@ -466,7 +459,7 @@ async function loadSettings() {
 }
 
 // ── Countdown ──
-function startCountdown(target, alreadyDone = false) {
+function startCountdown(target) {
   if (cdInterval) clearInterval(cdInterval);
   function tick() {
     const diff = target - new Date();
@@ -475,9 +468,7 @@ function startCountdown(target, alreadyDone = false) {
       giveawayEnded = true;
       document.getElementById('cd-label').textContent = 'Giveaway telah berakhir';
       document.getElementById('cd-display').innerHTML = '<div class="cd-ended">Pengumuman pemenang segera hadir!</div>';
-      // Kunci form hanya jika belum dalam state lain (already/stopped)
-      const mainVisible = document.getElementById('form-main').style.display !== 'none';
-      if (mainVisible && !alreadyDone) showFormState('ended');
+      if (document.getElementById('form-main').style.display !== 'none') showFormState('ended');
       return;
     }
     document.getElementById('cd-d').textContent = pad(Math.floor(diff/86400000));
@@ -521,7 +512,6 @@ async function loadWinners() {
 
 // ── Submit form ──
 async function submitDaftar() {
-  // Cek status dulu
   if (!giveawayActive) { showFormState('stopped'); return; }
   if (giveawayEnded)   { showFormState('ended');   return; }
 
@@ -538,27 +528,51 @@ async function submitDaftar() {
   if (!c1||!c2||!c3) { err.textContent = 'Centang semua pernyataan syarat dulu!'; err.style.display='block'; return; }
 
   btn.disabled = true;
-  btn.textContent = 'Memproses...';
+  btn.textContent = 'Memeriksa...';
+
   try {
-    // Cek duplikat
-    const dupSnap = await getDocs(query(collection(db,'peserta'), where('tiktok','==', tiktok.toLowerCase())));
+    const tiktokLower = tiktok.toLowerCase();
+
+    // ── Cek apakah sudah terdaftar ──
+    const dupSnap = await getDocs(query(
+      collection(db,'peserta'),
+      where('tiktok','==', tiktokLower)
+    ));
+
     if (!dupSnap.empty) {
-      // Sudah terdaftar — tampilkan state already
-      document.getElementById('already-body').textContent =
-        `Username ${tiktok} sudah terdaftar sebelumnya. Tunggu pengumuman pemenang ya!`;
-      showFormState('already');
-      return;
+      // Cek apakah ada izin approved untuk username ini
+      const izinSnap = await getDocs(query(
+        collection(db,'izin_daftar'),
+        where('tiktok','==', tiktokLower),
+        where('status','==','approved')
+      ));
+
+      if (!izinSnap.empty) {
+        // Ada izin approved → hapus data lama, biarkan daftar ulang
+        // (admin sudah setujui, lanjut proses normal)
+      } else {
+        // Belum ada izin / izin pending/rejected → blokir
+        document.getElementById('already-body').textContent =
+          `Username ${tiktok} sudah terdaftar. Jika ada kendala, ajukan permohonan izin daftar ulang di bawah.`;
+        // Simpan tiktok di hidden field untuk kirimIzin
+        document.getElementById('izin-tiktok-hidden').value = tiktokLower;
+        showFormState('already');
+        btn.disabled = false;
+        btn.textContent = 'Daftar Giveaway Sekarang';
+        return;
+      }
     }
+
+    // ── Daftar ──
     await addDoc(collection(db,'peserta'), {
-      tiktok: tiktok.toLowerCase(),
+      tiktok: tiktokLower,
       tiktokDisplay: tiktok,
       status: 'valid',
       createdAt: serverTimestamp(),
     });
-    // Simpan ke localStorage agar refresh tidak bisa daftar ulang
-    localStorage.setItem('giveaway_registered', tiktok);
     showFormState('success');
     launchConfetti();
+
   } catch(e) {
     err.textContent = 'Gagal mendaftar. Coba lagi ya!';
     err.style.display = 'block';
@@ -571,27 +585,41 @@ async function submitDaftar() {
 
 // ── Kirim permohonan izin daftar ulang ──
 async function kirimIzin() {
-  const tiktok  = document.getElementById('inp-tiktok').value.trim();
-  const alasan  = document.getElementById('izin-alasan').value.trim();
-  const err     = document.getElementById('izin-err');
-  const btn     = document.getElementById('btn-izin');
+  const tiktok = document.getElementById('izin-tiktok-hidden').value
+               || document.getElementById('inp-tiktok').value.trim().toLowerCase();
+  const alasan = document.getElementById('izin-alasan').value.trim();
+  const err    = document.getElementById('izin-err');
+  const btn    = document.getElementById('btn-izin');
 
   err.style.display = 'none';
   if (!alasan) { err.textContent = 'Tuliskan alasanmu dulu!'; err.style.display='block'; return; }
 
+  // Cek apakah sudah ada izin pending untuk username ini
+  try {
+    const existingIzin = await getDocs(query(
+      collection(db,'izin_daftar'),
+      where('tiktok','==', tiktok),
+      where('status','==','pending')
+    ));
+    if (!existingIzin.empty) {
+      err.textContent = 'Permohonan izin kamu sedang diproses admin. Harap tunggu!';
+      err.style.display = 'block';
+      return;
+    }
+  } catch(e) {}
+
   btn.disabled = true;
   btn.textContent = 'Mengirim...';
   try {
-    await addDoc(collection(db, 'izin_daftar'), {
-      tiktok: tiktok || 'tidak diisi',
+    await addDoc(collection(db,'izin_daftar'), {
+      tiktok,
       alasan,
-      status: 'pending', // pending | approved | rejected
+      status: 'pending',
       createdAt: serverTimestamp(),
     });
     document.getElementById('izin-success').style.display = 'block';
     document.getElementById('izin-alasan').style.display  = 'none';
     btn.style.display = 'none';
-    err.style.display = 'none';
   } catch(e) {
     err.textContent = 'Gagal mengirim. Coba lagi!';
     err.style.display = 'block';
