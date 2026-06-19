@@ -150,8 +150,8 @@ tr:hover td{background:#FAFFEE}
 
 /* SPIN WHEEL */
 .wheel-wrap{position:relative;display:flex;justify-content:center;align-items:center;padding:10px 0}
-.wheel-pointer{position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:28px;color:var(--lime-b);z-index:10;text-shadow:0 2px 6px rgba(0,0,0,.5)}
-#wheel-canvas{border-radius:50%;box-shadow:0 0 0 6px rgba(255,255,255,.15),0 8px 32px rgba(0,0,0,.3);max-width:100%}
+.wheel-pointer{position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:34px;color:var(--lime-b);z-index:10;text-shadow:0 2px 8px rgba(0,0,0,.6)}
+#wheel-canvas{border-radius:50%;box-shadow:0 0 0 6px rgba(255,255,255,.15),0 8px 32px rgba(0,0,0,.3);max-width:100%;width:min(420px,90vw);height:min(420px,90vw)}
 
 /* CERTIFICATE */
 .cert-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
@@ -320,17 +320,26 @@ tr:hover td{background:#FAFFEE}
         <div class="slot-title">🎡 Roda Keberuntungan</div>
         <div class="wheel-wrap">
           <div class="wheel-pointer">▼</div>
-          <canvas id="wheel-canvas" width="320" height="320"></canvas>
+          <canvas id="wheel-canvas" width="420" height="420"></canvas>
         </div>
         <div id="wheel-winner-display" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;color:var(--lime-b);text-align:center;margin:16px 0;min-height:28px"></div>
-        <div style="margin-bottom:16px">
-          <input class="winner-prize-input" id="prize-input-wheel" placeholder="Nominal hadiah (contoh: Rp 500.000)"/>
+
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;justify-content:center">
+          <div style="flex:1;min-width:140px">
+            <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,.6);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Jumlah Pemenang</label>
+            <input class="winner-prize-input" id="winner-count-input" type="number" min="1" value="1" style="width:100%"/>
+          </div>
+          <div style="flex:2;min-width:200px">
+            <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,.6);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Nominal Hadiah per Pemenang</label>
+            <input class="winner-prize-input" id="prize-input-wheel" placeholder="Contoh: Rp 500.000" style="width:100%"/>
+          </div>
         </div>
+
         <div class="slot-controls">
-          <button class="slot-btn slot-start" id="btn-wheel-spin">🎡 Putar Roda</button>
-          <button class="slot-btn slot-ulang" id="btn-wheel-ulang">🔄 Ulang</button>
-          <button class="slot-btn slot-save" id="btn-wheel-save">💾 Simpan Pemenang</button>
+          <button class="slot-btn slot-start" id="btn-wheel-spin">🎡 Putar &amp; Pilih Pemenang</button>
+          <button class="slot-btn slot-save" id="btn-wheel-save" style="display:none">💾 Simpan Pemenang</button>
         </div>
+        <p style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;margin-top:10px">Setiap putaran final — tidak ada tombol ulang agar undian tetap 100% murni dan adil.</p>
       </div>
 
       <div class="section">
@@ -768,34 +777,45 @@ function switchUndianMode(mode) {
 // ── SPIN WHEEL ──
 let wheelRotation = 0;
 let wheelSpinning = false;
-let wheelLastWinner = null;
 let wheelSegments = [];
+let wheelPendingWinners = []; // hasil spin multi-winner yang siap disimpan
 const wheelColors = ['#5DBA00','#7DDB1A','#A6F022','#FFE135','#FF8C00','#FF4FA3','#3DBAB4','#9B6DF5'];
 
-function getWheelPool() {
-  const usedTiktoks = sessionWinners.map(w => w.tiktok);
-  return allPeserta.filter(p => p.status==='valid' && !usedTiktoks.includes(p.tiktok));
+function getWheelPool(excludeTiktoks = []) {
+  const used = [...sessionWinners.map(w => w.tiktok), ...excludeTiktoks];
+  return allPeserta.filter(p => p.status==='valid' && !used.includes(p.tiktok));
 }
 
-function drawWheel() {
+function drawWheel(highlightIndex = -1) {
   const canvas = document.getElementById('wheel-canvas');
   const ctx = canvas.getContext('2d');
-  const cx = canvas.width/2, cy = canvas.height/2, r = canvas.width/2 - 6;
+  // Render di resolusi tinggi tetap (420x420) lalu di-scale CSS, jadi teks selalu tajam
+  const SIZE = 420;
+  canvas.width = SIZE; canvas.height = SIZE;
+  const cx = SIZE/2, cy = SIZE/2, r = SIZE/2 - 8;
 
-  wheelSegments = getWheelPool();
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  wheelSegments = getWheelPool(wheelPendingWinners.map(w=>w.tiktok));
+  ctx.clearRect(0,0,SIZE,SIZE);
 
   if (wheelSegments.length === 0) {
     ctx.fillStyle = '#EEE';
     ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = '#999';
-    ctx.font = 'bold 14px Nunito, sans-serif';
+    ctx.font = 'bold 16px Nunito, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Tidak ada peserta valid', cx, cy);
     return;
   }
 
   const segAngle = (Math.PI*2) / wheelSegments.length;
+  // Ukuran font menyesuaikan jumlah segmen — makin banyak makin kecil, tapi ada batas minimum
+  let fontSize = 17;
+  if (wheelSegments.length > 8)  fontSize = 15;
+  if (wheelSegments.length > 14) fontSize = 13;
+  if (wheelSegments.length > 20) fontSize = 11;
+  if (wheelSegments.length > 30) fontSize = 9;
+  const maxChars = wheelSegments.length > 20 ? 10 : wheelSegments.length > 12 ? 13 : 16;
+
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(wheelRotation);
@@ -813,85 +833,137 @@ function drawWheel() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Label (hanya jika cukup besar)
-    if (wheelSegments.length <= 24) {
-      ctx.save();
-      ctx.rotate(start + segAngle/2);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 11px Nunito, sans-serif';
-      const label = (p.tiktokDisplay||p.tiktok).slice(0, 14);
-      ctx.fillText(label, r - 10, 4);
-      ctx.restore();
-    }
+    // Label username — selalu tampil, dengan auto-size dan outline biar kebaca jelas
+    ctx.save();
+    ctx.rotate(start + segAngle/2);
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.font = `800 ${fontSize}px Nunito, sans-serif`;
+    const label = (p.tiktokDisplay||p.tiktok).slice(0, maxChars);
+    const labelX = r - 14;
+    // Outline gelap supaya kontras di semua warna segmen
+    ctx.strokeStyle = 'rgba(0,0,0,.45)';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(label, labelX, 0);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, labelX, 0);
+    ctx.restore();
   });
+
+  // Highlight pemenang (lingkaran tengah pulse saat hasil)
   ctx.restore();
+
+  // Center hub
+  ctx.beginPath();
+  ctx.arc(cx, cy, 22, 0, Math.PI*2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = wheelColors[0];
+  ctx.lineWidth = 3;
+  ctx.stroke();
 }
 
+// Putar roda 1x dan resolve dengan pemenangnya (dipakai untuk single & multi)
+function spinOnce(pool) {
+  return new Promise(resolve => {
+    const segAngle = (Math.PI*2) / pool.length;
+    const winnerIndex = Math.floor(Math.random() * pool.length);
+    const extraSpins = 6 + Math.random()*2;
+    const targetSegMid = winnerIndex * segAngle + segAngle/2;
+    const targetRotation = (extraSpins * Math.PI*2) + ( -Math.PI/2 - targetSegMid );
+
+    const startRotation = wheelRotation;
+    const duration = 3600;
+    const startTime = performance.now();
+
+    function animateSpin(now) {
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed/duration, 1);
+      const eased = 1 - Math.pow(1-t, 4);
+      wheelRotation = startRotation + targetRotation * eased;
+      drawWheel();
+      if (t < 1) {
+        requestAnimationFrame(animateSpin);
+      } else {
+        resolve(pool[winnerIndex]);
+      }
+    }
+    requestAnimationFrame(animateSpin);
+  });
+}
+
+// Putar roda otomatis sebanyak N kali berurutan (tanpa perlu tombol ulang)
 async function spinWheel() {
   if (wheelSpinning) return;
-  wheelSegments = getWheelPool();
-  if (wheelSegments.length === 0) { showToast('❌ Tidak ada peserta valid yang tersisa!'); return; }
+
+  const countInput = document.getElementById('winner-count-input');
+  const targetCount = Math.max(1, parseInt(countInput.value) || 1);
 
   wheelSpinning = true;
-  wheelLastWinner = null;
+  wheelPendingWinners = [];
+  document.getElementById('btn-wheel-spin').disabled = true;
+  document.getElementById('btn-wheel-save').style.display = 'none';
   document.getElementById('wheel-winner-display').textContent = '';
 
-  const segAngle = (Math.PI*2) / wheelSegments.length;
-  const winnerIndex = Math.floor(Math.random() * wheelSegments.length);
-  // Target: pointer di atas (sudut -90deg / -PI/2), tambah beberapa putaran penuh
-  const extraSpins = 6 + Math.random()*2; // 6-8 putaran penuh
-  const targetSegMid = winnerIndex * segAngle + segAngle/2;
-  // Supaya segmen target berhenti tepat di pointer (atas / -90deg)
-  const targetRotation = (extraSpins * Math.PI*2) + ( -Math.PI/2 - targetSegMid );
-
-  const startRotation = wheelRotation;
-  const duration = 4200;
-  const startTime = performance.now();
-
-  function animateSpin(now) {
-    const elapsed = now - startTime;
-    const t = Math.min(elapsed/duration, 1);
-    const eased = 1 - Math.pow(1-t, 4); // ease-out quart
-    wheelRotation = startRotation + targetRotation * eased;
-    drawWheel();
-    if (t < 1) {
-      requestAnimationFrame(animateSpin);
-    } else {
-      wheelSpinning = false;
-      wheelLastWinner = wheelSegments[winnerIndex];
-      document.getElementById('wheel-winner-display').textContent =
-        '🎉 ' + (wheelLastWinner.tiktokDisplay||wheelLastWinner.tiktok) + ' 🎉';
-      showToast('🎡 Pemenang terpilih!');
+  for (let i = 0; i < targetCount; i++) {
+    const pool = getWheelPool(wheelPendingWinners.map(w=>w.tiktok));
+    if (pool.length === 0) {
+      showToast(`⚠️ Peserta valid habis. Hanya berhasil memilih ${wheelPendingWinners.length} dari ${targetCount} pemenang.`);
+      break;
     }
-  }
-  requestAnimationFrame(animateSpin);
-}
+    document.getElementById('wheel-winner-display').textContent =
+      targetCount > 1 ? `Mengundi pemenang ke-${i+1} dari ${targetCount}...` : 'Mengundi...';
 
-function ulangWheel() {
+    const winner = await spinOnce(pool);
+    wheelPendingWinners.push(winner);
+
+    // Jeda singkat antar putaran biar tidak instan ke putaran berikutnya
+    if (i < targetCount - 1) await new Promise(r => setTimeout(r, 700));
+  }
+
   wheelSpinning = false;
-  wheelLastWinner = null;
-  document.getElementById('wheel-winner-display').textContent = '';
-  drawWheel();
-  showToast('🔄 Roda direset!');
+  document.getElementById('btn-wheel-spin').disabled = false;
+
+  if (wheelPendingWinners.length > 0) {
+    const names = wheelPendingWinners.map(w => w.tiktokDisplay||w.tiktok).join(', ');
+    document.getElementById('wheel-winner-display').textContent = `🎉 ${names} 🎉`;
+    document.getElementById('btn-wheel-save').style.display = 'inline-block';
+    showToast(wheelPendingWinners.length > 1 ? `🎡 ${wheelPendingWinners.length} pemenang terpilih!` : '🎡 Pemenang terpilih!');
+  }
 }
 
 async function saveWheelWinner() {
-  if (!wheelLastWinner) { showToast('❌ Belum ada pemenang terpilih!'); return; }
+  if (wheelPendingWinners.length === 0) { showToast('❌ Belum ada pemenang terpilih!'); return; }
   const prize = document.getElementById('prize-input-wheel').value.trim();
   if (!prize) { showToast('❌ Isi nominal hadiah dulu!'); return; }
-  const rank = sessionWinners.length + 1;
+
+  const btn = document.getElementById('btn-wheel-save');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan...';
+
   try {
-    await addDoc(collection(db,'pemenang'), { tiktok: wheelLastWinner.tiktokDisplay||wheelLastWinner.tiktok, prize, rank, savedAt: serverTimestamp() });
-    sessionWinners.push({tiktok: wheelLastWinner.tiktok, rank});
+    for (const w of wheelPendingWinners) {
+      const rank = sessionWinners.length + 1;
+      await addDoc(collection(db,'pemenang'), { tiktok: w.tiktokDisplay||w.tiktok, prize, rank, savedAt: serverTimestamp() });
+      sessionWinners.push({tiktok: w.tiktok, rank});
+    }
     renderWinnersLog();
     document.getElementById('stat-winner').textContent = sessionWinners.length;
-    wheelLastWinner = null;
-    document.getElementById('wheel-winner-display').textContent = 'Pemenang disimpan! Putar lagi untuk peserta berikutnya.';
+
+    const savedCount = wheelPendingWinners.length;
+    wheelPendingWinners = [];
+    document.getElementById('wheel-winner-display').textContent = `${savedCount} pemenang disimpan! Putar lagi untuk peserta berikutnya.`;
     document.getElementById('prize-input-wheel').value = '';
+    btn.style.display = 'none';
     drawWheel();
     showToast('💾 Pemenang disimpan ke Firebase!');
-  } catch(e) { showToast('❌ Gagal menyimpan'); }
+  } catch(e) {
+    showToast('❌ Gagal menyimpan');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Simpan Pemenang';
+  }
 }
 
 // ── PEMENANG PAGE ──
@@ -1318,7 +1390,6 @@ document.getElementById('btn-undian-save').addEventListener('click', saveWinner)
 document.getElementById('tab-slot').addEventListener('click', () => switchUndianMode('slot'));
 document.getElementById('tab-wheel').addEventListener('click', () => switchUndianMode('wheel'));
 document.getElementById('btn-wheel-spin').addEventListener('click', spinWheel);
-document.getElementById('btn-wheel-ulang').addEventListener('click', ulangWheel);
 document.getElementById('btn-wheel-save').addEventListener('click', saveWheelWinner);
 document.getElementById('btn-open-live').addEventListener('click', () => {
   window.open('live.html', '_blank');
