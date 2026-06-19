@@ -6,6 +6,7 @@
 <title>⚙️ Admin Panel — Giveaway</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -143,6 +144,18 @@ tr:hover td{background:#FAFFEE}
 .wl-rank{font-size:20px}
 .wl-del{background:rgba(255,68,68,.15);border:1px solid rgba(255,68,68,.3);color:var(--red);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer}
 
+/* UNDIAN TABS */
+.undian-tab{padding:11px 22px;border-radius:12px;border:2px solid var(--border);background:var(--white);color:var(--muted);font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;transition:all .2s}
+.undian-tab.active{background:linear-gradient(135deg,var(--lime),var(--lime-l));color:white;border-color:transparent}
+
+/* SPIN WHEEL */
+.wheel-wrap{position:relative;display:flex;justify-content:center;align-items:center;padding:10px 0}
+.wheel-pointer{position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:28px;color:var(--lime-b);z-index:10;text-shadow:0 2px 6px rgba(0,0,0,.5)}
+#wheel-canvas{border-radius:50%;box-shadow:0 0 0 6px rgba(255,255,255,.15),0 8px 32px rgba(0,0,0,.3);max-width:100%}
+
+/* CERTIFICATE */
+.cert-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+
 /* ── CHART ── */
 .chart-wrap{position:relative;height:200px}
 
@@ -209,6 +222,7 @@ tr:hover td{background:#FAFFEE}
       <div class="sb-item active" data-page="dashboard"><span class="si">📊</span> Dashboard</div>
       <div class="sb-item" data-page="peserta"><span class="si">👥</span> Peserta</div>
       <div class="sb-item" data-page="undian"><span class="si">🎰</span> Undian</div>
+      <div class="sb-item" data-page="live"><span class="si">📺</span> Layar Live</div>
       <div class="sb-item" data-page="pemenang"><span class="si">🏆</span> Pemenang</div>
       <div class="sb-item" data-page="izin"><span class="si">📩</span> Izin Daftar</div>
       <div class="sb-section">Pengaturan</div>
@@ -279,7 +293,14 @@ tr:hover td{background:#FAFFEE}
     <!-- UNDIAN -->
     <div class="page" id="page-undian">
       <div class="topbar"><div><div class="page-title">🎰 Undian</div><div class="page-sub">Pilih pemenang secara acak & adil</div></div></div>
-      <div class="slot-machine">
+
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <button class="undian-tab active" id="tab-slot" data-mode="slot">🎰 Slot Machine</button>
+        <button class="undian-tab" id="tab-wheel" data-mode="wheel">🎡 Roda Keberuntungan</button>
+      </div>
+
+      <!-- MODE: SLOT MACHINE -->
+      <div class="slot-machine" id="undian-slot">
         <div class="slot-title">🎰 Mesin Undian Pemenang</div>
         <div class="slot-screen">
           <div class="slot-text" id="slot-text">Tekan "Mulai Undian" untuk memilih pemenang!</div>
@@ -293,11 +314,39 @@ tr:hover td{background:#FAFFEE}
           <button class="slot-btn slot-save" id="btn-undian-save">💾 Simpan Pemenang</button>
         </div>
       </div>
+
+      <!-- MODE: SPIN WHEEL -->
+      <div class="slot-machine" id="undian-wheel" style="display:none">
+        <div class="slot-title">🎡 Roda Keberuntungan</div>
+        <div class="wheel-wrap">
+          <div class="wheel-pointer">▼</div>
+          <canvas id="wheel-canvas" width="320" height="320"></canvas>
+        </div>
+        <div id="wheel-winner-display" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;color:var(--lime-b);text-align:center;margin:16px 0;min-height:28px"></div>
+        <div style="margin-bottom:16px">
+          <input class="winner-prize-input" id="prize-input-wheel" placeholder="Nominal hadiah (contoh: Rp 500.000)"/>
+        </div>
+        <div class="slot-controls">
+          <button class="slot-btn slot-start" id="btn-wheel-spin">🎡 Putar Roda</button>
+          <button class="slot-btn slot-ulang" id="btn-wheel-ulang">🔄 Ulang</button>
+          <button class="slot-btn slot-save" id="btn-wheel-save">💾 Simpan Pemenang</button>
+        </div>
+      </div>
+
       <div class="section">
         <div class="section-title">📋 Pemenang Sesi Ini</div>
         <div id="winners-log-wrap">
           <p style="font-size:13px;color:var(--muted)">Belum ada undian. Tekan "Mulai Undian" di atas.</p>
         </div>
+      </div>
+    </div>
+
+    <!-- LAYAR LIVE -->
+    <div class="page" id="page-live">
+      <div class="topbar"><div><div class="page-title">📺 Layar Live</div><div class="page-sub">Tampilan full-screen untuk di-share saat live</div></div></div>
+      <div class="section">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">Buka tampilan full-screen berisi counter peserta dan countdown raksasa — cocok untuk di-screen-share saat live TikTok atau Zoom. Klik tombol di bawah untuk membuka di tab baru.</p>
+        <button id="btn-open-live" style="padding:14px 28px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--lime),var(--lime-l));color:white;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 4px 16px rgba(93,186,0,.35)">📺 Buka Layar Live</button>
       </div>
     </div>
 
@@ -549,6 +598,7 @@ function listenPeserta() {
     updateStats();
     filterTable();
     buildChart();
+    if (document.getElementById('undian-wheel').style.display !== 'none' && !wheelSpinning) drawWheel();
   });
 }
 
@@ -706,6 +756,144 @@ function renderWinnersLog() {
     </div>`).join('') + '</div>';
 }
 
+// ── UNDIAN MODE TAB SWITCH ──
+function switchUndianMode(mode) {
+  document.getElementById('tab-slot').classList.toggle('active', mode==='slot');
+  document.getElementById('tab-wheel').classList.toggle('active', mode==='wheel');
+  document.getElementById('undian-slot').style.display  = mode==='slot'  ? 'block' : 'none';
+  document.getElementById('undian-wheel').style.display = mode==='wheel' ? 'block' : 'none';
+  if (mode === 'wheel') drawWheel();
+}
+
+// ── SPIN WHEEL ──
+let wheelRotation = 0;
+let wheelSpinning = false;
+let wheelLastWinner = null;
+let wheelSegments = [];
+const wheelColors = ['#5DBA00','#7DDB1A','#A6F022','#FFE135','#FF8C00','#FF4FA3','#3DBAB4','#9B6DF5'];
+
+function getWheelPool() {
+  const usedTiktoks = sessionWinners.map(w => w.tiktok);
+  return allPeserta.filter(p => p.status==='valid' && !usedTiktoks.includes(p.tiktok));
+}
+
+function drawWheel() {
+  const canvas = document.getElementById('wheel-canvas');
+  const ctx = canvas.getContext('2d');
+  const cx = canvas.width/2, cy = canvas.height/2, r = canvas.width/2 - 6;
+
+  wheelSegments = getWheelPool();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if (wheelSegments.length === 0) {
+    ctx.fillStyle = '#EEE';
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#999';
+    ctx.font = 'bold 14px Nunito, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Tidak ada peserta valid', cx, cy);
+    return;
+  }
+
+  const segAngle = (Math.PI*2) / wheelSegments.length;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(wheelRotation);
+
+  wheelSegments.forEach((p, i) => {
+    const start = i * segAngle;
+    const end   = start + segAngle;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,r,start,end);
+    ctx.closePath();
+    ctx.fillStyle = wheelColors[i % wheelColors.length];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Label (hanya jika cukup besar)
+    if (wheelSegments.length <= 24) {
+      ctx.save();
+      ctx.rotate(start + segAngle/2);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px Nunito, sans-serif';
+      const label = (p.tiktokDisplay||p.tiktok).slice(0, 14);
+      ctx.fillText(label, r - 10, 4);
+      ctx.restore();
+    }
+  });
+  ctx.restore();
+}
+
+async function spinWheel() {
+  if (wheelSpinning) return;
+  wheelSegments = getWheelPool();
+  if (wheelSegments.length === 0) { showToast('❌ Tidak ada peserta valid yang tersisa!'); return; }
+
+  wheelSpinning = true;
+  wheelLastWinner = null;
+  document.getElementById('wheel-winner-display').textContent = '';
+
+  const segAngle = (Math.PI*2) / wheelSegments.length;
+  const winnerIndex = Math.floor(Math.random() * wheelSegments.length);
+  // Target: pointer di atas (sudut -90deg / -PI/2), tambah beberapa putaran penuh
+  const extraSpins = 6 + Math.random()*2; // 6-8 putaran penuh
+  const targetSegMid = winnerIndex * segAngle + segAngle/2;
+  // Supaya segmen target berhenti tepat di pointer (atas / -90deg)
+  const targetRotation = (extraSpins * Math.PI*2) + ( -Math.PI/2 - targetSegMid );
+
+  const startRotation = wheelRotation;
+  const duration = 4200;
+  const startTime = performance.now();
+
+  function animateSpin(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed/duration, 1);
+    const eased = 1 - Math.pow(1-t, 4); // ease-out quart
+    wheelRotation = startRotation + targetRotation * eased;
+    drawWheel();
+    if (t < 1) {
+      requestAnimationFrame(animateSpin);
+    } else {
+      wheelSpinning = false;
+      wheelLastWinner = wheelSegments[winnerIndex];
+      document.getElementById('wheel-winner-display').textContent =
+        '🎉 ' + (wheelLastWinner.tiktokDisplay||wheelLastWinner.tiktok) + ' 🎉';
+      showToast('🎡 Pemenang terpilih!');
+    }
+  }
+  requestAnimationFrame(animateSpin);
+}
+
+function ulangWheel() {
+  wheelSpinning = false;
+  wheelLastWinner = null;
+  document.getElementById('wheel-winner-display').textContent = '';
+  drawWheel();
+  showToast('🔄 Roda direset!');
+}
+
+async function saveWheelWinner() {
+  if (!wheelLastWinner) { showToast('❌ Belum ada pemenang terpilih!'); return; }
+  const prize = document.getElementById('prize-input-wheel').value.trim();
+  if (!prize) { showToast('❌ Isi nominal hadiah dulu!'); return; }
+  const rank = sessionWinners.length + 1;
+  try {
+    await addDoc(collection(db,'pemenang'), { tiktok: wheelLastWinner.tiktokDisplay||wheelLastWinner.tiktok, prize, rank, savedAt: serverTimestamp() });
+    sessionWinners.push({tiktok: wheelLastWinner.tiktok, rank});
+    renderWinnersLog();
+    document.getElementById('stat-winner').textContent = sessionWinners.length;
+    wheelLastWinner = null;
+    document.getElementById('wheel-winner-display').textContent = 'Pemenang disimpan! Putar lagi untuk peserta berikutnya.';
+    document.getElementById('prize-input-wheel').value = '';
+    drawWheel();
+    showToast('💾 Pemenang disimpan ke Firebase!');
+  } catch(e) { showToast('❌ Gagal menyimpan'); }
+}
+
 // ── PEMENANG PAGE ──
 async function loadPemenang() {
   const snap = await getDocs(query(collection(db,'pemenang'), orderBy('rank','asc')));
@@ -714,13 +902,14 @@ async function loadPemenang() {
   if (snap.empty) { list.innerHTML='<p style="font-size:14px;color:var(--muted);text-align:center;padding:24px">Belum ada pemenang tersimpan.</p>'; return; }
   list.innerHTML = snap.docs.map(d=>{
     const w=d.data();
-    return `<div style="display:flex;align-items:center;gap:14px;background:var(--lime-pale);border:2px solid var(--border);border-radius:16px;padding:14px 18px;margin-bottom:10px">
+    return `<div style="display:flex;align-items:center;gap:14px;background:var(--lime-pale);border:2px solid var(--border);border-radius:16px;padding:14px 18px;margin-bottom:10px;flex-wrap:wrap">
       <div style="font-size:28px">${rankEmoji[w.rank-1]||w.rank}</div>
-      <div style="flex:1">
+      <div style="flex:1;min-width:120px">
         <div style="font-family:'Nunito',sans-serif;font-weight:800;font-size:15px">${w.tiktok}</div>
         <div style="font-size:12px;color:var(--muted)">TikTok</div>
       </div>
       <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;color:var(--lime)">${w.prize}</div>
+      <button class="act-btn" style="background:#FFF3D0;color:#A06000" data-action="cert" data-tiktok="${w.tiktok}" data-prize="${w.prize}" data-rank="${w.rank}">📜 Sertifikat</button>
       <button class="act-btn btn-del" data-action="deletepemenang" data-id="${d.id}">🗑️ Hapus</button>
     </div>`;
   }).join('');
@@ -736,6 +925,107 @@ function deletePemenang(id) {
     closeModal(); loadPemenang(); showToast('🗑️ Pemenang dihapus!');
   };
   document.getElementById('confirm-modal').classList.add('show');
+}
+
+// ── SERTIFIKAT PEMENANG (PDF) ──
+async function generateSertifikat(tiktok, prize, rank) {
+  showToast('⏳ Membuat sertifikat...');
+  try {
+    const { jsPDF } = window.jspdf;
+    const docPdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const W = 297, H = 210;
+
+    // Ambil nama admin & nama giveaway dari settings
+    const snap = await getDoc(doc(db,'settings','main'));
+    const s = snap.exists() ? snap.data() : {};
+    const adminName = s.adminName || 'Admin Giveaway';
+    const giveawayAmount = s.giveawayAmount || 'Giveaway Dana';
+
+    // Background
+    docPdf.setFillColor(247, 255, 240); // off white-green
+    docPdf.rect(0, 0, W, H, 'F');
+
+    // Border lime
+    docPdf.setDrawColor(93, 186, 0);
+    docPdf.setLineWidth(2);
+    docPdf.rect(8, 8, W-16, H-16);
+    docPdf.setLineWidth(0.5);
+    docPdf.rect(12, 12, W-24, H-24);
+
+    // Header
+    docPdf.setTextColor(93, 186, 0);
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.setFontSize(14);
+    docPdf.text('SERTIFIKAT PEMENANG', W/2, 40, { align: 'center' });
+
+    docPdf.setTextColor(26, 46, 0);
+    docPdf.setFontSize(28);
+    docPdf.text(giveawayAmount.toUpperCase(), W/2, 52, { align: 'center' });
+
+    // Rank badge text
+    const rankLabel = {1:'JUARA 1', 2:'JUARA 2', 3:'JUARA 3'}[rank] || `JUARA ${rank}`;
+    docPdf.setFontSize(12);
+    docPdf.setTextColor(160, 96, 0);
+    docPdf.text(rankLabel, W/2, 65, { align: 'center' });
+
+    // "Diberikan kepada"
+    docPdf.setFont('helvetica', 'normal');
+    docPdf.setFontSize(13);
+    docPdf.setTextColor(107, 143, 58);
+    docPdf.text('Dengan bangga sertifikat ini diberikan kepada', W/2, 85, { align: 'center' });
+
+    // Nama pemenang
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.setFontSize(36);
+    docPdf.setTextColor(26, 46, 0);
+    docPdf.text(tiktok, W/2, 105, { align: 'center' });
+
+    // Garis bawah nama
+    docPdf.setDrawColor(93, 186, 0);
+    docPdf.setLineWidth(1);
+    const nameWidth = docPdf.getTextWidth(tiktok);
+    docPdf.line(W/2 - nameWidth/2 - 5, 110, W/2 + nameWidth/2 + 5, 110);
+
+    // Deskripsi
+    docPdf.setFont('helvetica', 'normal');
+    docPdf.setFontSize(13);
+    docPdf.setTextColor(45, 74, 0);
+    docPdf.text('sebagai pemenang resmi dalam giveaway yang diselenggarakan dengan', W/2, 122, { align: 'center' });
+    docPdf.text('penuh transparansi dan keadilan.', W/2, 129, { align: 'center' });
+
+    // Hadiah box
+    docPdf.setFillColor(237, 255, 208);
+    docPdf.roundedRect(W/2 - 40, 140, 80, 20, 4, 4, 'F');
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.setFontSize(18);
+    docPdf.setTextColor(93, 186, 0);
+    docPdf.text(prize, W/2, 152, { align: 'center' });
+
+    // Footer: tanggal & admin
+    const tgl = new Date().toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
+    docPdf.setFont('helvetica', 'normal');
+    docPdf.setFontSize(10);
+    docPdf.setTextColor(107, 143, 58);
+    docPdf.text(`Diterbitkan pada ${tgl}`, W/2, 175, { align: 'center' });
+
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.setFontSize(11);
+    docPdf.setTextColor(26, 46, 0);
+    docPdf.text(adminName, W/2, 192, { align: 'center' });
+    docPdf.setDrawColor(180, 180, 180);
+    docPdf.setLineWidth(0.3);
+    docPdf.line(W/2 - 30, 186, W/2 + 30, 186);
+    docPdf.setFont('helvetica', 'normal');
+    docPdf.setFontSize(8);
+    docPdf.setTextColor(150, 150, 150);
+    docPdf.text('Penyelenggara Giveaway', W/2, 197, { align: 'center' });
+
+    docPdf.save(`Sertifikat-${tiktok.replace('@','')}.pdf`);
+    showToast('✅ Sertifikat berhasil dibuat!');
+  } catch(e) {
+    console.error(e);
+    showToast('❌ Gagal membuat sertifikat');
+  }
 }
 
 // ── SETTINGS ──
@@ -1025,6 +1315,14 @@ document.getElementById('modal-cancel-btn').addEventListener('click', closeModal
 document.getElementById('btn-undian-start').addEventListener('click', startUndian);
 document.getElementById('btn-undian-ulang').addEventListener('click', ulangUndian);
 document.getElementById('btn-undian-save').addEventListener('click', saveWinner);
+document.getElementById('tab-slot').addEventListener('click', () => switchUndianMode('slot'));
+document.getElementById('tab-wheel').addEventListener('click', () => switchUndianMode('wheel'));
+document.getElementById('btn-wheel-spin').addEventListener('click', spinWheel);
+document.getElementById('btn-wheel-ulang').addEventListener('click', ulangWheel);
+document.getElementById('btn-wheel-save').addEventListener('click', saveWheelWinner);
+document.getElementById('btn-open-live').addEventListener('click', () => {
+  window.open('live.html', '_blank');
+});
 document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
 document.getElementById('btn-toggle-giveaway').addEventListener('click', toggleGiveaway);
 document.getElementById('btn-reset-semua').addEventListener('click', resetSemua);
@@ -1070,6 +1368,7 @@ document.addEventListener('click', e => {
   if (action === 'deletepemenang') deletePemenang(id);
   if (action === 'approve-izin')   updateIzinStatus(id, 'approved');
   if (action === 'reject-izin')    updateIzinStatus(id, 'rejected');
+  if (action === 'cert')           generateSertifikat(btn.dataset.tiktok, btn.dataset.prize, parseInt(btn.dataset.rank));
 });
 </script>
 </body>
