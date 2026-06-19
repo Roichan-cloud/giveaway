@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Layar Live — Giveaway</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --lime:#5DBA00;--lime-l:#7DDB1A;--lime-b:#A6F022;
+  --dark:#0A1200;--white:#fff;
+}
+html,body{height:100%}
+body{
+  background:radial-gradient(circle at 50% 0%, #142400 0%, #060D00 70%);
+  color:var(--white);
+  font-family:'Poppins',sans-serif;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  overflow:hidden;
+  position:relative;
+}
+
+/* glow particles bg */
+.glow{position:absolute;border-radius:50%;filter:blur(60px);opacity:.35;pointer-events:none}
+.glow1{width:500px;height:500px;background:var(--lime);top:-150px;left:-150px}
+.glow2{width:400px;height:400px;background:var(--lime-b);bottom:-100px;right:-100px}
+
+.wrap{position:relative;z-index:1;text-align:center;width:100%;max-width:1000px;padding:20px}
+
+.badge{
+  display:inline-block;
+  background:rgba(166,240,34,.12);
+  border:1px solid rgba(166,240,34,.3);
+  color:var(--lime-b);
+  font-family:'Nunito',sans-serif;
+  font-weight:800;
+  font-size:clamp(13px,1.8vw,18px);
+  letter-spacing:4px;
+  text-transform:uppercase;
+  padding:10px 28px;
+  border-radius:50px;
+  margin-bottom:24px;
+}
+
+.amount{
+  font-family:'Nunito',sans-serif;
+  font-weight:900;
+  font-size:clamp(40px,7vw,90px);
+  background:linear-gradient(135deg,var(--lime),var(--lime-b) 60%,#FFE135);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:-2px;
+  margin-bottom:8px;
+  line-height:1.05;
+}
+
+.label{
+  font-family:'Nunito',sans-serif;
+  font-weight:700;
+  font-size:clamp(16px,2.2vw,24px);
+  color:rgba(255,255,255,.6);
+  margin-bottom:50px;
+}
+
+/* COUNTDOWN */
+.cd-grid{display:flex;justify-content:center;gap:clamp(10px,2vw,24px);margin-bottom:50px;flex-wrap:wrap}
+.cd-item{display:flex;flex-direction:column;align-items:center}
+.cd-num{
+  font-family:'Nunito',sans-serif;
+  font-weight:900;
+  font-size:clamp(48px,9vw,120px);
+  line-height:1;
+  background:rgba(255,255,255,.05);
+  border:2px solid rgba(166,240,34,.3);
+  border-radius:24px;
+  width:clamp(90px,15vw,180px);
+  height:clamp(90px,15vw,180px);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 40px rgba(166,240,34,.15);
+  color:var(--white);
+}
+.cd-unit{
+  font-family:'Nunito',sans-serif;
+  font-weight:800;
+  font-size:clamp(11px,1.4vw,16px);
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.4);
+  margin-top:14px;
+}
+
+.cd-ended{
+  font-family:'Nunito',sans-serif;
+  font-weight:900;
+  font-size:clamp(32px,5vw,56px);
+  color:var(--lime-b);
+  margin-bottom:50px;
+}
+
+/* MANUAL GOAL */
+.manual-goal{
+  font-family:'Nunito',sans-serif;
+  font-weight:900;
+  font-size:clamp(28px,4.5vw,52px);
+  color:var(--white);
+  margin-bottom:50px;
+  max-width:800px;
+  line-height:1.3;
+}
+
+/* COUNTER */
+.counter-wrap{
+  display:inline-flex;
+  align-items:center;
+  gap:16px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(166,240,34,.2);
+  border-radius:24px;
+  padding:20px 40px;
+}
+.counter-dot{width:14px;height:14px;border-radius:50%;background:var(--lime-b);animation:pulse 1.2s ease-in-out infinite;box-shadow:0 0 16px var(--lime-b)}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.6}}
+.counter-num{font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(28px,4vw,44px);color:var(--lime-b)}
+.counter-label{font-family:'Nunito',sans-serif;font-weight:700;font-size:clamp(14px,1.8vw,20px);color:rgba(255,255,255,.6)}
+
+.footer{
+  position:fixed;bottom:24px;left:0;right:0;text-align:center;
+  font-size:clamp(11px,1.2vw,14px);color:rgba(255,255,255,.25);
+  font-family:'Nunito',sans-serif;font-weight:600;letter-spacing:1px;
+}
+</style>
+</head>
+<body>
+
+<div class="glow glow1"></div>
+<div class="glow glow2"></div>
+
+<div class="wrap">
+  <div class="badge" id="badge-text">GIVEAWAY SEDANG BERLANGSUNG</div>
+  <div class="amount" id="amount-text">DANA</div>
+  <div class="label" id="label-text">Giveaway dana tunai gratis</div>
+
+  <div id="countdown-wrap">
+    <div class="cd-grid">
+      <div class="cd-item"><div class="cd-num" id="cd-d">00</div><div class="cd-unit">Hari</div></div>
+      <div class="cd-item"><div class="cd-num" id="cd-h">00</div><div class="cd-unit">Jam</div></div>
+      <div class="cd-item"><div class="cd-num" id="cd-m">00</div><div class="cd-unit">Menit</div></div>
+      <div class="cd-item"><div class="cd-num" id="cd-s">00</div><div class="cd-unit">Detik</div></div>
+    </div>
+  </div>
+
+  <div class="manual-goal" id="manual-goal-wrap" style="display:none">
+    <span id="manual-goal-text">-</span>
+  </div>
+
+  <div class="counter-wrap">
+    <div class="counter-dot"></div>
+    <div class="counter-num" id="counter-num">0</div>
+    <div class="counter-label">Peserta Terdaftar</div>
+  </div>
+</div>
+
+<div class="footer">LIVE — Update otomatis secara real-time</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, doc, getDoc, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const pad = n => String(n).padStart(2,'0');
+let cdInterval = null;
+
+async function loadSettings() {
+  try {
+    const snap = await getDoc(doc(db,'settings','main'));
+    const s = snap.exists() ? snap.data() : {};
+
+    document.getElementById('amount-text').textContent = s.giveawayAmount || 'DANA';
+    document.getElementById('label-text').textContent  = s.heroDesc || 'Giveaway dana tunai gratis';
+
+    const stopMode = s.stopMode || 'countdown';
+    const active = s.giveawayActive !== false;
+
+    if (stopMode === 'manual') {
+      document.getElementById('countdown-wrap').style.display = 'none';
+      document.getElementById('manual-goal-wrap').style.display = 'block';
+      document.getElementById('manual-goal-text').textContent = s.stopReason || 'Ditentukan oleh admin';
+      document.getElementById('badge-text').textContent = active ? 'GIVEAWAY SEDANG BERLANGSUNG' : 'GIVEAWAY TELAH BERAKHIR';
+    } else {
+      document.getElementById('manual-goal-wrap').style.display = 'none';
+      document.getElementById('countdown-wrap').style.display = 'block';
+      if (!active) {
+        document.getElementById('countdown-wrap').innerHTML = '<div class="cd-ended">GIVEAWAY TELAH BERAKHIR</div>';
+        document.getElementById('badge-text').textContent = 'GIVEAWAY TELAH BERAKHIR';
+      } else if (s.targetDate) {
+        startCountdown(new Date(s.targetDate));
+      }
+    }
+  } catch(e) { console.error(e); }
+}
+
+function startCountdown(target) {
+  if (cdInterval) clearInterval(cdInterval);
+  function tick() {
+    const diff = target - new Date();
+    if (diff <= 0) {
+      clearInterval(cdInterval);
+      document.getElementById('countdown-wrap').innerHTML = '<div class="cd-ended">GIVEAWAY TELAH BERAKHIR</div>';
+      document.getElementById('badge-text').textContent = 'GIVEAWAY TELAH BERAKHIR';
+      return;
+    }
+    document.getElementById('cd-d').textContent = pad(Math.floor(diff/86400000));
+    document.getElementById('cd-h').textContent = pad(Math.floor((diff%86400000)/3600000));
+    document.getElementById('cd-m').textContent = pad(Math.floor((diff%3600000)/60000));
+    document.getElementById('cd-s').textContent = pad(Math.floor((diff%60000)/1000));
+  }
+  tick();
+  cdInterval = setInterval(tick, 1000);
+}
+
+function listenParticipants() {
+  onSnapshot(query(collection(db,'peserta')), snap => {
+    document.getElementById('counter-num').textContent = snap.size;
+  });
+}
+
+loadSettings();
+listenParticipants();
+</script>
+</body>
+</html>
