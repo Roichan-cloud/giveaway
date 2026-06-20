@@ -154,6 +154,11 @@ canvas#confetti{position:fixed;top:0;left:0;width:100%;height:100%;pointer-event
 .form-closed-title{font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;color:var(--dark);margin-bottom:8px}
 .form-closed-body{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:20px}
 
+/* NEXT GIVEAWAY BOX */
+.next-giveaway-box{margin-top:18px;background:linear-gradient(135deg,var(--lime-pale),var(--lime-pale2));border:2px solid var(--border);border-radius:16px;padding:18px 20px;text-align:left}
+.next-giveaway-label{font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--lime);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.next-giveaway-text{font-family:'Nunito',sans-serif;font-weight:700;font-size:15px;color:var(--dark);line-height:1.5}
+
 /* IZIN DAFTAR ULANG */
 .izin-form{display:none;margin-top:16px;padding-top:16px;border-top:2px dashed var(--border)}
 .izin-title{font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:var(--dark);margin-bottom:8px}
@@ -327,6 +332,7 @@ canvas#confetti{position:fixed;top:0;left:0;width:100%;height:100%;pointer-event
       <div class="form-closed-title">Giveaway Dihentikan</div>
       <div class="form-closed-body">Giveaway ini telah dihentikan oleh admin sebelum waktunya.<br/>Nantikan giveaway berikutnya!</div>
       <div id="stopped-reason" style="display:none;margin-top:10px;font-size:13px;color:var(--muted);background:var(--lime-pale2);border-radius:10px;padding:10px 14px;text-align:left"></div>
+      <div id="next-giveaway-stopped" class="next-giveaway-box" style="display:none"></div>
     </div>
 
     <!-- State: waktu habis -->
@@ -334,6 +340,7 @@ canvas#confetti{position:fixed;top:0;left:0;width:100%;height:100%;pointer-event
       <div class="form-closed-icon">⏰</div>
       <div class="form-closed-title">Waktu Pendaftaran Habis</div>
       <div class="form-closed-body">Giveaway sudah berakhir dan pendaftaran ditutup.<br/>Nantikan pengumuman pemenang di saluran WhatsApp!</div>
+      <div id="next-giveaway-ended" class="next-giveaway-box" style="display:none"></div>
     </div>
 
     <!-- State: sudah pernah daftar -->
@@ -447,6 +454,9 @@ async function loadSettings() {
       setTimeout(() => document.getElementById('popup').classList.add('show'), 3000);
     }
 
+    // Simpan teks giveaway selanjutnya untuk dipakai saat form terkunci
+    window._nextGiveawayText = s.nextGiveawayText || '';
+
     const stopMode = s.stopMode || 'countdown';
 
     // ── Mode Manual: tampilkan goal, sembunyikan countdown ──
@@ -460,6 +470,7 @@ async function loadSettings() {
         document.getElementById('stopped-reason').textContent     = s.stopReason ? `Pencapaian: ${s.stopReason}` : '';
         document.getElementById('stopped-reason').style.display   = s.stopReason ? 'block' : 'none';
         showFormState('stopped');
+        showNextGiveaway('next-giveaway-stopped');
       }
 
     // ── Mode Countdown: tampilkan timer, sembunyikan manual ──
@@ -471,6 +482,7 @@ async function loadSettings() {
         document.getElementById('stopped-reason').textContent   = s.stopReason ? `Alasan: ${s.stopReason}` : '';
         document.getElementById('stopped-reason').style.display = s.stopReason ? 'block' : 'none';
         showFormState('stopped');
+        showNextGiveaway('next-giveaway-stopped');
       } else if (s.targetDate) {
         const target = new Date(s.targetDate);
         document.getElementById('cd-target-txt').textContent =
@@ -484,6 +496,21 @@ async function loadSettings() {
   } catch(e) {
     console.error('Settings error:', e);
     bar.style.opacity = '0';
+  }
+}
+
+// ── Tampilkan info giveaway selanjutnya di box terkait ──
+function showNextGiveaway(targetId) {
+  const text = window._nextGiveawayText;
+  const box = document.getElementById(targetId);
+  if (!box) return;
+  if (text) {
+    box.innerHTML = `
+      <div class="next-giveaway-label">🎁 Giveaway Selanjutnya</div>
+      <div class="next-giveaway-text">${text}</div>`;
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
   }
 }
 
@@ -520,8 +547,8 @@ async function loadWinners() {
 
 // ── Submit form ──
 async function submitDaftar() {
-  if (!giveawayActive) { showFormState('stopped'); return; }
-  if (giveawayEnded)   { showFormState('ended');   return; }
+  if (!giveawayActive) { showFormState('stopped'); showNextGiveaway('next-giveaway-stopped'); return; }
+  if (giveawayEnded)   { showFormState('ended');   showNextGiveaway('next-giveaway-ended');   return; }
 
   const tiktok = document.getElementById('inp-tiktok').value.trim();
   const c1 = document.getElementById('c1').checked;
@@ -750,7 +777,10 @@ function startCountdown(target) {
       document.title = '⏰ Giveaway Berakhir!';
       document.getElementById('cd-label').textContent = 'Giveaway telah berakhir';
       document.getElementById('cd-display').innerHTML = '<div class="cd-ended">Pengumuman pemenang segera hadir!</div>';
-      if (document.getElementById('form-main').style.display !== 'none') showFormState('ended');
+      if (document.getElementById('form-main').style.display !== 'none') {
+        showFormState('ended');
+        showNextGiveaway('next-giveaway-ended');
+      }
       kirimNotif('⏰ Giveaway Berakhir!', 'Waktu pendaftaran sudah habis. Nantikan pengumuman pemenang!');
       return;
     }
