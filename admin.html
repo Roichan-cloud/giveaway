@@ -422,6 +422,17 @@ tr:hover td{background:#FAFFEE}
         </div>
       </div>
 
+      <!-- Giveaway Selanjutnya -->
+      <div class="section">
+        <div class="section-title">🎁 Giveaway Selanjutnya</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6">Teks ini muncul di halaman publik hanya saat giveaway sudah berakhir (waktu habis / dihentikan). Kosongkan jika belum ada info.</p>
+        <div class="field-row">
+          <label class="field-label">Info Giveaway Berikutnya</label>
+          <textarea class="field-input" id="s-next-giveaway" rows="3" placeholder="Contoh: Giveaway berikutnya akan dimulai 1 Juli 2026 dengan hadiah Rp 1.000.000!" style="resize:vertical"></textarea>
+          <div class="field-hint">Tampil sebagai kotak info di bawah pesan giveaway berakhir</div>
+        </div>
+      </div>
+
       <button class="settings-btn" id="btn-save-settings">💾 Simpan Semua Pengaturan</button>
 
       <!-- RESET GIVEAWAY -->
@@ -1115,6 +1126,7 @@ async function loadSettings() {
     document.getElementById('s-popup-title').value  = s.popupTitle||'';
     document.getElementById('s-popup-body').value   = s.popupBody||'';
     document.getElementById('s-popup-enabled').checked = s.popupEnabled!==false;
+    document.getElementById('s-next-giveaway').value   = s.nextGiveawayText||'';
     if (s.targetDate) {
       const dt = new Date(s.targetDate);
       const local = new Date(dt.getTime()-dt.getTimezoneOffset()*60000).toISOString().slice(0,16);
@@ -1127,17 +1139,18 @@ async function loadSettings() {
 async function saveSettings() {
   const targetVal = document.getElementById('s-target').value;
   const data = {
-    adminName:      document.getElementById('s-admin').value.trim(),
-    giveawayAmount: document.getElementById('s-amount').value.trim(),
-    heroDesc:       document.getElementById('s-desc').value.trim(),
-    linkWA:         document.getElementById('s-wa').value.trim(),
-    linkTikTok:     document.getElementById('s-tt').value.trim(),
-    popupIcon:      document.getElementById('s-popup-icon').value.trim(),
-    popupTitle:     document.getElementById('s-popup-title').value.trim(),
-    popupBody:      document.getElementById('s-popup-body').value.trim(),
-    popupEnabled:   document.getElementById('s-popup-enabled').checked,
-    targetDate:     targetVal ? new Date(targetVal).toISOString() : null,
-    updatedAt:      serverTimestamp(),
+    adminName:        document.getElementById('s-admin').value.trim(),
+    giveawayAmount:   document.getElementById('s-amount').value.trim(),
+    heroDesc:         document.getElementById('s-desc').value.trim(),
+    linkWA:           document.getElementById('s-wa').value.trim(),
+    linkTikTok:       document.getElementById('s-tt').value.trim(),
+    popupIcon:        document.getElementById('s-popup-icon').value.trim(),
+    popupTitle:       document.getElementById('s-popup-title').value.trim(),
+    popupBody:        document.getElementById('s-popup-body').value.trim(),
+    popupEnabled:     document.getElementById('s-popup-enabled').checked,
+    nextGiveawayText: document.getElementById('s-next-giveaway').value.trim(),
+    targetDate:       targetVal ? new Date(targetVal).toISOString() : null,
+    updatedAt:        serverTimestamp(),
   };
   try {
     await setDoc(doc(db,'settings','main'), data, {merge:true});
